@@ -121,14 +121,15 @@
         import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
 
         // ==========================================
-        // CONFIGURACIÓN ESPECÍFICA - TRACKS & TELEMETRY
+        // CONFIGURACIÓN
         // ==========================================
         
-        const APP_ID = "app_tracks";  // Base de datos Tracks
+        // Usamos el ID de la app del entorno si existe, o el fallback
+        const APP_ID = typeof __app_id !== 'undefined' ? __app_id : "app_tracks";
         const PRECIO = "15€";   
         
-        // ¡¡¡ IMPORTANTE: CAMBIA ESTO CUANDO TENGAS LA URL !!!
-        let CLIENT_URL = "https://URL_PENDIENTE_DE_ASIGNAR/index.html"; 
+        // URL ACTUALIZADA
+        let CLIENT_URL = "https://slotcarhome-star.github.io/Circuitos3d/index.html"; 
         // ==========================================
 
         const firebaseConfig = JSON.parse(__firebase_config);
@@ -150,6 +151,7 @@
         // --- SEGURIDAD LOCAL ---
         window.checkPass = function() {
             const pass = document.getElementById('admin-pass').value;
+            // Contraseña simple para demo
             if(pass === "admin123") {
                 document.getElementById('login-overlay').style.display = 'none';
                 document.getElementById('main-panel').classList.remove('hidden');
@@ -159,11 +161,20 @@
             }
         }
         document.getElementById('btn-login').addEventListener('click', window.checkPass);
+        
+        // Enter para login
+        document.getElementById('admin-pass').addEventListener('keypress', function (e) {
+            if (e.key === 'Enter') {
+                window.checkPass();
+            }
+        });
+
         document.getElementById('btn-logout').addEventListener('click', () => location.reload());
 
         // --- ESTADÍSTICAS ---
         function initStats() {
             try {
+                // Escuchamos 'stats' en la colección pública
                 onSnapshot(doc(db, 'artifacts', APP_ID, 'public', 'data', 'stats'), (docSnap) => {
                     const count = docSnap.data()?.purchase_clicks || 0;
                     document.getElementById('clicks-counter').textContent = count;
@@ -219,7 +230,7 @@
             for(let i=0; i<4; i++) code += chars.charAt(Math.floor(Math.random() * chars.length));
 
             try {
-                // Guardamos en la colección 'access_codes' de app_tracks
+                // Guardamos en la colección 'access_codes'
                 await addDoc(collection(db, 'artifacts', APP_ID, 'public', 'data', 'access_codes'), {
                     email: email, 
                     code: code, 
