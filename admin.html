@@ -7,9 +7,8 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
-        body { background-color: #064e3b; /* Fondo verde muy oscuro */ font-family: sans-serif; color: white; }
-        /* Fondo con un toque verde oscuro para diferenciarlo del Silver */
-        body { background: radial-gradient(circle at center, #064e3b 0%, #022c22 100%); }
+        /* Esquema de colores VERDE para Tracks & Telemetry */
+        body { background: radial-gradient(circle at center, #064e3b 0%, #022c22 100%); font-family: sans-serif; color: white; }
         
         .glass { background: rgba(6, 78, 59, 0.6); backdrop-filter: blur(10px); border: 1px solid rgba(52, 211, 153, 0.2); }
         .input-dark { background: #064e3b; border: 1px solid #059669; color: white; outline: none; transition: 0.3s; }
@@ -109,11 +108,11 @@
         import { getFirestore, collection, addDoc, doc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
         import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
 
-        // DATOS FIJOS TRACKS & TELEMETRY
+        // ==========================================
+        // CONFIGURACIÓN ESPECÍFICA TRACKS & TELEMETRY
+        // ==========================================
         const PRECIO = "15€";
         const APP_ID = "app_tracks";
-        
-        // URL FIJA PROPORCIONADA
         const CLIENT_URL = "https://slotcarhome-star.github.io/Circuitos3d/index.html"; 
 
         const firebaseConfig = {
@@ -138,7 +137,6 @@
         // --- SEGURIDAD ---
         window.checkPass = function() {
             const pass = document.getElementById('admin-pass').value;
-            // Misma contraseña simple, cambiar si es necesario
             if(pass === "admin123") {
                 document.getElementById('login-overlay').style.display = 'none';
                 document.getElementById('main-panel').classList.remove('hidden');
@@ -157,7 +155,7 @@
                     const count = docSnap.data()?.purchase_clicks || 0;
                     document.getElementById('clicks-counter').textContent = count;
                 }, (error) => {
-                    console.warn("No se pudieron leer estadísticas (puede que no existan aún para esta app)");
+                    console.warn("No se pudieron leer estadísticas.");
                     document.getElementById('clicks-counter').textContent = "-";
                 });
             } catch(e) { console.warn("Stats desactivadas"); }
@@ -168,9 +166,10 @@
             const email = document.getElementById('client-email-1').value;
             if(!email) return alert("Escribe el correo del interesado.");
             
+            // ASUNTO ACTUALIZADO
             const subject = encodeURIComponent("Instrucciones Pago TRACKS & TELEMETRY");
             
-            // CORREO INSTRUCCIONES 15€
+            // CUERPO ACTUALIZADO (15€ y Nombre App)
             const body = `Hola ${email},%0D%0A%0D%0APara activar tu licencia de TRACKS & TELEMETRY, los pasos son:%0D%0A%0D%0A1. Importe: ${PRECIO}%0D%0A2. Realiza el pago (Bizum/Transferencia) según lo acordado.%0D%0A%0D%0AEnvíame el justificante respondiendo a este correo y recibirás tu clave de activación inmediata.%0D%0A%0D%0AGracias por elegir SlotCarHome.`;
             
             window.location.href = `mailto:${email}?subject=${subject}&body=${body}`;
@@ -203,7 +202,7 @@
                     code: code, 
                     active: true, 
                     createdAt: new Date().toISOString(),
-                    type: "Tracks & Telemetry License" // Etiqueta opcional para claridad en DB
+                    type: "Tracks & Telemetry License"
                 });
 
                 status.textContent = "✅ Licencia TRACKS Guardada";
@@ -211,7 +210,7 @@
 
                 const subject = encodeURIComponent("Tu Licencia TRACKS & TELEMETRY - Activada");
                 
-                // CORREO ENTREGA TRACKS
+                // CORREO ENTREGA CON ENLACE CORRECTO
                 const bodyText = `SlotCarHome le da las gracias por confiar en nuestros productos.%0D%0A%0D%0APago recibido correctamente. Aquí tienes tu acceso para TRACKS & TELEMETRY:%0D%0A%0D%0A📧 Usuario: ${email}%0D%0A🔑 CLAVE: ${code}%0D%0A%0D%0A👉 Entra y activa aquí: ${CLIENT_URL}%0D%0A%0D%0A¡A disfrutar de los circuitos!`;
                 
                 btnSend.href = `mailto:${email}?subject=${subject}&body=${bodyText}`;
