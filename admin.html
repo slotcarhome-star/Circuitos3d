@@ -7,7 +7,7 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
-        /* Estilo base - Dark Green Theme */
+        /* Estilo base */
         body { background-color: #020617; font-family: sans-serif; color: white; }
         
         /* Glassmorphism Verde */
@@ -30,29 +30,28 @@
             box-shadow: 0 0 10px rgba(74, 222, 128, 0.3); 
         }
 
-        /* Animaciones */
-        .shake { animation: shake 0.5s cubic-bezier(.36,.07,.19,.97) both; }
-        @keyframes shake {
-            10%, 90% { transform: translate3d(-1px, 0, 0); }
-            20%, 80% { transform: translate3d(2px, 0, 0); }
-            30%, 50%, 70% { transform: translate3d(-4px, 0, 0); }
-            40%, 60% { transform: translate3d(4px, 0, 0); }
+        /* Caja de Previsualización de Correo */
+        .mail-preview {
+            background: rgba(0, 0, 0, 0.4);
+            border: 1px dashed #34d399;
+            padding: 10px;
+            border-radius: 8px;
+            font-family: monospace;
+            font-size: 0.75rem;
+            color: #d1fae5;
+            white-space: pre-line; /* Respeta los saltos de línea */
+            margin-top: 10px;
+            margin-bottom: 10px;
         }
     </style>
 </head>
-<body class="min-h-screen p-2 flex flex-col items-center justify-center">
+<body class="min-h-screen p-2">
 
     <!-- 1. PANTALLA DE BLOQUEO -->
     <div id="login-overlay" class="fixed inset-0 bg-black z-50 flex flex-col items-center justify-center p-4">
         <div class="glass p-8 rounded-2xl w-full max-w-sm text-center shadow-2xl border border-green-800">
             <i class="fas fa-satellite-dish text-5xl text-green-500 mb-6"></i>
             <h2 class="text-xl font-bold mb-4">Admin TRACKS & TELEMETRY</h2>
-            
-            <!-- Aviso de estado de conexión -->
-            <div id="connection-status" class="hidden mb-4 p-2 bg-yellow-900/50 border border-yellow-600 rounded text-xs text-yellow-200">
-                <i class="fas fa-exclamation-triangle mr-1"></i> Sin configuración Firebase detectada
-            </div>
-
             <input type="password" id="admin-pass" class="w-full input-dark p-3 rounded-lg mb-4 text-center" placeholder="Contraseña">
             <button id="btn-login" class="w-full bg-green-700 hover:bg-green-600 text-white font-bold py-3 rounded-lg transition border border-green-600">ENTRAR</button>
             <p id="login-msg" class="text-red-400 text-xs mt-3 hidden">Contraseña incorrecta</p>
@@ -60,7 +59,7 @@
     </div>
 
     <!-- 2. PANEL PRINCIPAL -->
-    <div id="main-panel" class="hidden w-full max-w-md mx-auto space-y-6 pb-10 mt-4">
+    <div id="main-panel" class="hidden max-w-md mx-auto space-y-6">
         
         <!-- CABECERA -->
         <header class="text-center py-4">
@@ -89,9 +88,19 @@
             
             <input type="email" id="client-email-1" class="w-full input-dark rounded p-2 text-sm mb-3" placeholder="Correo del interesado...">
             
-            <button id="btn-request-payment" class="w-full bg-green-800 hover:bg-green-700 text-white font-bold py-2 rounded text-sm flex justify-center gap-2 border border-green-600">
-                <i class="fas fa-paper-plane text-green-200"></i> ENVIAR DATOS PAGO
+            <!-- Botón Previsualizar -->
+            <button id="btn-preview-payment" class="w-full bg-green-800 hover:bg-green-700 text-white font-bold py-2 rounded text-sm flex justify-center gap-2 border border-green-600 mb-2">
+                <i class="fas fa-eye text-green-200"></i> PREVISUALIZAR CORREO
             </button>
+
+            <!-- Contenedor Vista Previa (Oculto inicialmente) -->
+            <div id="preview-box-1" class="hidden">
+                <p class="text-[10px] text-emerald-400 font-bold uppercase mb-1">Vista Previa:</p>
+                <div id="preview-content-1" class="mail-preview"></div>
+                <a id="btn-real-send-1" href="#" target="_blank" class="block w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-2 rounded text-center text-sm">
+                    <i class="fas fa-paper-plane mr-2"></i> ABRIR GESTOR DE CORREO
+                </a>
+            </div>
         </div>
 
         <!-- FASE 2: ENTREGAR LICENCIA -->
@@ -100,7 +109,6 @@
             <h2 class="text-sm font-bold text-emerald-300 mb-3"><i class="fas fa-gift mr-2"></i>Generar y Entregar</h2>
             
             <div class="space-y-3">
-                
                 <div>
                     <label class="text-[10px] text-emerald-200/70 font-bold uppercase">Correo Cliente (Pagado)</label>
                     <input type="email" id="client-email-2" class="w-full input-dark rounded p-2 text-sm focus:border-emerald-400 font-mono">
@@ -117,188 +125,136 @@
                         <p id="display-code" class="text-xl font-mono text-white font-bold tracking-widest select-all">---</p>
                     </div>
 
+                    <!-- Vista Previa Fase 2 -->
+                    <div class="mb-3">
+                        <p class="text-[10px] text-emerald-400 font-bold uppercase mb-1">Mensaje a enviar:</p>
+                        <div id="preview-content-2" class="mail-preview"></div>
+                    </div>
+
                     <a id="btn-send-delivery" href="#" target="_blank" class="block w-full bg-blue-700 hover:bg-blue-600 text-white font-bold py-3 rounded text-center shadow-lg border border-blue-500 text-sm">
-                        <i class="fas fa-envelope-open-text mr-2"></i> ABRIR CORREO Y ENVIAR
+                        <i class="fas fa-envelope-open-text mr-2"></i> ABRIR CORREO FINAL
                     </a>
                     <p id="status" class="text-center text-xs text-emerald-300 mt-2 font-bold"></p>
                 </div>
             </div>
         </div>
-
-        <div class="text-center pt-4 pb-8">
+        
+        <div class="text-center pt-4">
              <button id="btn-logout" class="text-emerald-600 hover:text-white text-xs"><i class="fas fa-power-off mr-1"></i> Cerrar Sesión</button>
         </div>
-    </div>
-
-    <!-- NOTIFICACION -->
-    <div id="toast" class="fixed bottom-5 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white px-4 py-2 rounded-lg shadow-xl border border-gray-600 hidden z-50 text-sm font-bold">
-        Mensaje
     </div>
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getFirestore, collection, addDoc, doc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
 
         // ==========================================
-        // CONFIGURACIÓN (Protegida)
+        // CONFIGURACIÓN ESPECÍFICA
         // ==========================================
-        const APP_ID = typeof __app_id !== 'undefined' ? __app_id : "app_tracks";
+        const APP_ID = "app_tracks"; 
         const PRECIO = "15€";   
         let CLIENT_URL = "https://slotcarhome-star.github.io/Circuitos3d/index.html"; 
-
         // ==========================================
-        // FIREBASE SAFE INIT
-        // ==========================================
-        let app, auth, db;
-        let firebaseConfig = null;
 
-        // Intentamos obtener la config de la variable global (chat) O del código manual si la añades
-        try {
-            if (typeof __firebase_config !== 'undefined') {
-                firebaseConfig = JSON.parse(__firebase_config);
-            } else {
-                // AQUÍ PUEDES PEGAR TU CONFIGURACIÓN SI QUIERES QUE FUNCIONE EN GITHUB
-                // Si la dejas vacía, el login funciona pero no guardará datos.
-                /* firebaseConfig = {
-                    apiKey: "...",
-                    authDomain: "...",
-                    // ... resto de datos
-                }; 
-                */
-            }
-        } catch (e) {
-            console.warn("No se pudo parsear la config automática");
-        }
-
-        // Inicializamos Firebase SOLO si existe la config, si no, no rompemos el script
-        if (firebaseConfig) {
+        const firebaseConfig = JSON.parse(__firebase_config);
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+        
+        const initAuth = async () => {
             try {
-                app = initializeApp(firebaseConfig);
-                auth = getAuth(app);
-                db = getFirestore(app);
-                
-                // Auth automática
-                const initAuth = async () => {
-                    try {
-                        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                            await signInWithCustomToken(auth, __initial_auth_token);
-                        } else {
-                            await signInAnonymously(auth);
-                        }
-                    } catch (e) { console.error("Error auth:", e); }
-                };
-                initAuth();
-            } catch (e) {
-                console.error("Error iniciando Firebase:", e);
-            }
-        } else {
-            document.getElementById('connection-status').classList.remove('hidden');
-        }
+                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                    await signInWithCustomToken(auth, __initial_auth_token);
+                } else {
+                    await signInAnonymously(auth);
+                }
+            } catch (e) { console.error("Error auth:", e); }
+        };
+        initAuth();
 
-        // ==========================================
-        // LÓGICA DE LOGIN (Ahora es segura)
-        // ==========================================
+        // --- SEGURIDAD LOCAL ---
         window.checkPass = function() {
             const pass = document.getElementById('admin-pass').value;
-            const errorMsg = document.getElementById('login-msg');
-            const overlay = document.getElementById('login-overlay');
-
             if(pass === "admin123") {
-                // Ocultar error y login
-                errorMsg.classList.add('hidden');
-                overlay.style.opacity = '0';
-                
-                // Retraso para la animación
-                setTimeout(() => {
-                    overlay.style.display = 'none';
-                    document.getElementById('main-panel').classList.remove('hidden');
-                    // Solo cargamos stats si la base de datos está activa
-                    if (db) initStats(); 
-                }, 300);
+                document.getElementById('login-overlay').style.display = 'none';
+                document.getElementById('main-panel').classList.remove('hidden');
+                initStats();
             } else {
-                errorMsg.classList.remove('hidden');
-                // Efecto de vibración
-                const input = document.getElementById('admin-pass');
-                input.parentElement.classList.add('shake');
-                setTimeout(() => input.parentElement.classList.remove('shake'), 500);
+                document.getElementById('login-msg').classList.remove('hidden');
             }
         }
-
-        // Event Listeners (Importante para que el botón funcione)
         document.getElementById('btn-login').addEventListener('click', window.checkPass);
-        
-        document.getElementById('admin-pass').addEventListener('keypress', function (e) {
-            if (e.key === 'Enter') window.checkPass();
-        });
-
         document.getElementById('btn-logout').addEventListener('click', () => location.reload());
 
-        // ==========================================
-        // FUNCIONES DEL PANEL
-        // ==========================================
-        function showToast(msg, isError = false) {
-            const t = document.getElementById('toast');
-            t.textContent = msg;
-            t.className = `fixed bottom-5 left-1/2 transform -translate-x-1/2 px-6 py-3 rounded-lg shadow-2xl border z-50 text-sm font-bold transition-all duration-300 ${isError ? 'bg-red-900/90 border-red-700 text-red-100' : 'bg-emerald-900/90 border-emerald-700 text-emerald-100'}`;
-            t.classList.remove('hidden');
-            setTimeout(() => t.classList.add('hidden'), 3000);
-        }
-
+        // --- ESTADÍSTICAS ---
         function initStats() {
             try {
-                if(!db) return;
                 onSnapshot(doc(db, 'artifacts', APP_ID, 'public', 'data', 'stats'), (docSnap) => {
                     const count = docSnap.data()?.purchase_clicks || 0;
                     document.getElementById('clicks-counter').textContent = count;
-                }, (error) => console.warn("Stats offline"));
-            } catch(e) { }
+                }, (error) => {
+                    console.warn("Esperando datos...", error.message);
+                    document.getElementById('clicks-counter').textContent = "0";
+                });
+            } catch(e) { console.warn("Stats error", e); }
         }
 
-        // --- FASE 1 ---
-        document.getElementById('btn-request-payment').addEventListener('click', function() {
+        // --- FASE 1: PREVISUALIZAR PAGO ---
+        document.getElementById('btn-preview-payment').addEventListener('click', function() {
             const email = document.getElementById('client-email-1').value;
+            const previewBox = document.getElementById('preview-box-1');
+            const previewContent = document.getElementById('preview-content-1');
+            const btnRealSend = document.getElementById('btn-real-send-1');
+
             if(!email) {
-                showToast("Escribe el correo del interesado", true);
+                alert("Escribe el correo del interesado.");
                 return;
             }
+
+            // Construcción del mensaje (usamos \n para saltos de línea visibles en el div)
+            const subject = "Instrucciones Pago - TRACKS & TELEMETRY";
+            const bodyVisible = `Hola, ${email}\n\nHas solicitado acceso a TRACKS & TELEMETRY.\n\nPara completar la activación:\n1. Realiza el pago acordado: ${PRECIO}\n2. Responde a este correo con el justificante.\n\nTe enviaremos tu clave de acceso inmediato al recibirlo.\n\nGracias por confiar en SlotCarHome.`;
+
+            // Construcción para mailto (usamos encodeURIComponent)
+            const subjectEncoded = encodeURIComponent(subject);
+            // Reemplazamos \n con %0D%0A para el mailto
+            const bodyEncoded = encodeURIComponent(bodyVisible); // encodeURIComponent maneja los saltos de línea del string
+
+            // Mostrar visualmente
+            previewContent.textContent = `ASUNTO: ${subject}\n\n${bodyVisible}`;
+            previewBox.classList.remove('hidden');
             
-            const subject = encodeURIComponent("Instrucciones Pago - TRACKS & TELEMETRY");
-            const body = `Hola,${email}%0D%0A%0D%0AHas solicitado acceso a TRACKS & TELEMETRY.%0D%0A%0D%0APara completar la activación:%0D%0A1. Realiza el pago acordado: ${PRECIO}%0D%0A2. Responde a este correo con el justificante.%0D%0A%0D%0ATe enviaremos tu clave de acceso inmediato al recibirlo.%0D%0A%0D%0AGracias por confiar en SlotCarHome.`;
+            // Configurar botón real
+            btnRealSend.href = `mailto:${email}?subject=${subjectEncoded}&body=${bodyEncoded}`;
             
-            window.open(`mailto:${email}?subject=${subject}&body=${body}`, '_blank');
+            // Copiar email al paso 2 por comodidad
             document.getElementById('client-email-2').value = email;
         });
 
-        // --- FASE 2 ---
+        // --- FASE 2: GENERAR Y GUARDAR (TRACKS) ---
         document.getElementById('btn-save').addEventListener('click', async function() {
             const email = document.getElementById('client-email-2').value.trim();
             const btn = document.getElementById('btn-save');
             const status = document.getElementById('status');
             const deliverySection = document.getElementById('delivery-section');
             const btnSend = document.getElementById('btn-send-delivery');
+            const previewContent2 = document.getElementById('preview-content-2');
 
             if(!email) {
-                showToast("Falta el correo del cliente", true);
+                alert("Falta el correo del cliente.");
                 return;
             }
             
-            if (!auth || !auth.currentUser) {
-                showToast("⚠️ Sin conexión a la Base de Datos. Modo Demo.", true);
-                // Si no hay conexión, simulamos para que veas que la lógica va
-                if(!firebaseConfig) {
-                    status.textContent = "⚠️ MODO SIN CONEXIÓN (Clave no guardada)";
-                } else {
-                     status.textContent = "❌ Error Auth";
-                     return;
-                }
+            if (!auth.currentUser) {
+                status.textContent = "❌ Error: Recarga la página (Auth)";
+                return;
             }
             
             btn.disabled = true; 
-            const originalText = btn.innerHTML;
             btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> GENERANDO...';
 
-            // Generador
+            // Generador de código
             const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
             let code = "T-"; 
             for(let i=0; i<4; i++) code += chars.charAt(Math.floor(Math.random() * chars.length));
@@ -306,31 +262,34 @@
             for(let i=0; i<4; i++) code += chars.charAt(Math.floor(Math.random() * chars.length));
 
             try {
-                if(db && auth && auth.currentUser) {
-                    await addDoc(collection(db, 'artifacts', APP_ID, 'public', 'data', 'access_codes'), {
-                        email: email, 
-                        code: code, 
-                        active: true, 
-                        createdAt: new Date().toISOString(),
-                        createdBy: auth.currentUser.uid,
-                        product: "Tracks & Telemetry"
-                    });
-                    status.textContent = "✅ Acceso Generado y Guardado";
-                } else {
-                    // Fallback visual si no hay DB
-                    status.textContent = "⚠️ Clave Generada (No guardada en nube)";
-                }
+                // Guardamos en la colección 'access_codes'
+                await addDoc(collection(db, 'artifacts', APP_ID, 'public', 'data', 'access_codes'), {
+                    email: email, 
+                    code: code, 
+                    active: true, 
+                    createdAt: new Date().toISOString(),
+                    createdBy: auth.currentUser.uid,
+                    product: "Tracks & Telemetry"
+                });
 
+                status.textContent = "✅ Acceso Generado Correctamente";
                 status.className = "text-center text-xs text-emerald-300 mt-2 font-bold";
                 document.getElementById('display-code').textContent = code;
 
-                const subject = encodeURIComponent("Tu Licencia TRACKS & TELEMETRY - Activada");
-                const bodyText = `SlotCarHome te agradece tu compra.%0D%0A%0D%0AAquí tienes tu acceso profesional a TRACKS & TELEMETRY:%0D%0A%0D%0A👤 Usuario: ${email}%0D%0A🔑 CLAVE: ${code}%0D%0A%0D%0A👉 Acceso Web: ${CLIENT_URL}%0D%0A%0D%0A¡A disfrutar de la telemetría!`;
+                // PREPARAR CORREO FASE 2
+                const subject = "Tu Licencia TRACKS & TELEMETRY - Activada";
+                const bodyVisible = `SlotCarHome te agradece tu compra.\n\nAquí tienes tu acceso profesional a TRACKS & TELEMETRY:\n\n👤 Usuario: ${email}\n🔑 CLAVE: ${code}\n\n👉 Acceso Web: ${CLIENT_URL}\n\n¡A disfrutar de la telemetría!`;
+
+                // Mostrar en pantalla
+                previewContent2.textContent = `ASUNTO: ${subject}\n\n${bodyVisible}`;
+
+                // Configurar enlace
+                const subjectEncoded = encodeURIComponent(subject);
+                const bodyEncoded = encodeURIComponent(bodyVisible);
+                btnSend.href = `mailto:${email}?subject=${subjectEncoded}&body=${bodyEncoded}`;
                 
-                btnSend.href = `mailto:${email}?subject=${subject}&body=${bodyText}`;
                 deliverySection.classList.remove('hidden');
                 document.getElementById('client-email-1').value = "";
-                showToast("Licencia lista");
 
             } catch (error) { 
                 console.error(error); 
@@ -339,7 +298,7 @@
             }
             
             btn.disabled = false; 
-            btn.innerHTML = originalText;
+            btn.innerHTML = '<i class="fas fa-cogs mr-1"></i> GUARDAR Y PREPARAR ENTREGA';
         });
     </script>
 </body>
