@@ -6,18 +6,22 @@
     <title>Tracks & Telemetry - Acceso Profesional</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <!-- Chart.js para simulación de telemetría -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
     <style>
-        /* Estilo Base Oscuro (mismo sans-serif que el original) */
+        /* --- ESTILOS GENERALES --- */
         body { 
             background: linear-gradient(180deg, #000000 0%, #051a05 50%, #0a290a 100%);
-            font-family: sans-serif; 
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; 
             color: #f0fdf4;
+            overflow-x: hidden;
         }
 
-        /* Paneles con estética Neón Verde */
+        /* --- ESTÉTICA NEÓN --- */
         .neon-panel {
             background: linear-gradient(145deg, #111 0%, #0a0a0a 45%, #050505 100%);
-            border: 1px solid #39ff14; /* Verde Neón */
+            border: 1px solid #39ff14;
             box-shadow: 0 0 20px rgba(57, 255, 20, 0.15), inset 0 0 15px rgba(57, 255, 20, 0.05);
             color: #e2e8f0;
         }
@@ -29,7 +33,6 @@
             box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.5);
         }
 
-        /* Texto brillante */
         .neon-text {
             color: #39ff14;
             text-shadow: 0 0 10px rgba(57, 255, 20, 0.5);
@@ -38,13 +41,13 @@
             -webkit-text-fill-color: transparent;
         }
 
-        /* Botón estilo Neón */
         .btn-neon {
             background: linear-gradient(180deg, #1a1a1a 0%, #000000 100%);
             color: #39ff14;
             border: 1px solid #39ff14;
             transition: all 0.3s ease;
             box-shadow: 0 0 10px rgba(57, 255, 20, 0.1);
+            cursor: pointer;
         }
         .btn-neon:hover {
             background: #39ff14;
@@ -52,28 +55,10 @@
             transform: translateY(-2px);
             box-shadow: 0 0 25px rgba(57, 255, 20, 0.6);
         }
-
-        #app-frame { width: 100vw; height: 100vh; border: none; display: none; background: black; }
-        
-        .img-container {
-            width: 100%;
-            max-width: 240px;
-            margin: 0 auto 2.5rem auto;
-            position: relative;
-        }
-
-        .aspect-9-16 {
-            width: 100%;
-            aspect-ratio: 9 / 16;
-            object-fit: cover;
-            border-radius: 1rem;
-            box-shadow: 0 0 30px rgba(57, 255, 20, 0.2);
-            border: 2px solid #39ff14;
-            background: #050505;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            overflow: hidden;
+        .btn-neon:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
         }
 
         .input-neon {
@@ -89,7 +74,29 @@
         }
         .input-neon::placeholder { color: #1a4d1a; }
 
-        /* Modal de Alerta de Sesión */
+        /* --- IMAGEN --- */
+        .img-container {
+            width: 100%;
+            max-width: 240px;
+            margin: 0 auto 2.5rem auto;
+            position: relative;
+        }
+
+        .aspect-9-16 {
+            width: 100%;
+            aspect-ratio: 9 / 16;
+            border-radius: 1rem;
+            box-shadow: 0 0 30px rgba(57, 255, 20, 0.2);
+            border: 2px solid #39ff14;
+            background: #050505;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            position: relative;
+        }
+
+        /* --- MODAL --- */
         #session-alert {
             display: none;
             position: fixed;
@@ -100,9 +107,29 @@
             justify-content: center;
             backdrop-filter: blur(5px);
         }
+
+        /* --- DASHBOARD INTERNO (Reemplaza al iframe) --- */
+        #app-dashboard {
+            display: none;
+            width: 100%;
+            min-height: 100vh;
+            background-color: #050505;
+            position: relative;
+            padding-bottom: 80px;
+        }
+
+        .track-card {
+            background: rgba(20, 20, 20, 0.8);
+            border: 1px solid #333;
+            transition: 0.3s;
+        }
+        .track-card:hover {
+            border-color: #39ff14;
+            box-shadow: 0 0 15px rgba(57, 255, 20, 0.1);
+        }
     </style>
 </head>
-<body class="min-h-screen overflow-y-auto">
+<body class="min-h-screen">
 
     <!-- Modal de Sesión Duplicada -->
     <div id="session-alert">
@@ -116,7 +143,8 @@
         </div>
     </div>
 
-    <div id="auth-container" class="min-h-screen flex flex-col items-center justify-center p-4 md:p-6">
+    <!-- PANTALLA DE LOGIN -->
+    <div id="auth-container" class="min-h-screen flex flex-col items-center justify-center p-4 md:p-6 transition-opacity duration-500">
         
         <div class="text-center mb-8 md:mb-10 mt-4">
             <h1 class="text-3xl md:text-4xl font-black tracking-tighter neon-text uppercase">TRACKS & TELEMETRY</h1>
@@ -125,23 +153,26 @@
         </div>
 
         <div class="img-container">
-            <div class="aspect-9-16">
-                <img id="user-image" src="tracks.jpg" 
-                     alt="[Imagen Tracks]" 
-                     class="w-full h-full object-cover"
-                     onerror="this.style.display='none'; document.getElementById('placeholder').style.display='flex';">
-                
-                <div id="placeholder" class="flex flex-col items-center justify-center p-5 text-center text-green-800" style="display: none;">
-                    <i class="fas fa-satellite-dish text-5xl mb-4 opacity-40 text-green-500"></i>
-                    <p class="text-xs font-bold uppercase tracking-widest neon-text">tracks.jpg</p>
+            <div class="aspect-9-16 relative group">
+                <!-- Fallback visual usando FontAwesome si no hay imagen -->
+                <div class="absolute inset-0 flex flex-col items-center justify-center bg-black/80 z-0">
+                    <i class="fas fa-route text-6xl text-[#39ff14] opacity-20 mb-4 animate-pulse"></i>
+                    <div class="w-full h-32 absolute bottom-0 bg-gradient-to-t from-[#39ff14]/10 to-transparent"></div>
+                    <!-- Grid Lines simulación -->
+                    <div class="absolute inset-0 opacity-10" style="background-image: linear-gradient(#39ff14 1px, transparent 1px), linear-gradient(90deg, #39ff14 1px, transparent 1px); background-size: 20px 20px;"></div>
                 </div>
+                
+                <img id="user-image" src="tracks.jpg" 
+                     alt="Portada" 
+                     class="w-full h-full object-cover relative z-10"
+                     onerror="this.style.display='none';">
             </div>
         </div>
 
         <div class="w-full max-w-4xl grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8 items-stretch">
 
             <!-- Panel Compra -->
-            <div class="neon-panel rounded-3xl p-6 md:p-8 relative flex flex-col justify-between">
+            <div class="neon-panel rounded-3xl p-6 md:p-8 relative flex flex-col justify-between transform transition hover:scale-[1.01]">
                 <div class="absolute -top-3 -right-3 bg-black text-[#39ff14] text-[9px] font-bold px-3 py-1 rounded-full border border-[#39ff14] shadow-[0_0_10px_#39ff14]">LICENCIA PRO</div>
                 
                 <div>
@@ -150,7 +181,7 @@
                     </h2>
                     
                     <p class="text-gray-300 text-sm mb-6 leading-relaxed font-medium">
-                        Acceso completo a la base de datos de circuitos y telemetría avanzada. Pago único de 15€.
+                        Acceso completo a la base de datos de circuitos y telemetría avanzada.
                     </p>
 
                     <div class="bg-black/40 rounded-2xl p-5 border border-[#39ff14]/30 mb-6">
@@ -168,12 +199,15 @@
             </div>
 
             <!-- Panel Login -->
-            <div class="glass-panel rounded-3xl p-6 md:p-8 flex flex-col">
+            <div class="glass-panel rounded-3xl p-6 md:p-8 flex flex-col relative overflow-hidden">
+                <!-- Efecto brillo fondo -->
+                <div class="absolute top-0 right-0 w-32 h-32 bg-[#39ff14] opacity-5 rounded-full blur-3xl -mr-10 -mt-10"></div>
+
                 <h2 class="text-lg md:text-xl font-bold text-white mb-6 flex items-center neon-text">
                     <i class="fas fa-fingerprint mr-3"></i> ACCESO CLIENTE
                 </h2>
 
-                <form id="login-form" class="space-y-6 flex-grow">
+                <form id="login-form" class="space-y-6 flex-grow z-10">
                     <div>
                         <label class="block text-[10px] font-black text-green-500 uppercase mb-2 tracking-widest">Identificación</label>
                         <input type="email" id="email" required 
@@ -183,12 +217,12 @@
 
                     <div>
                         <label class="block text-[10px] font-black text-green-500 uppercase mb-2 tracking-widest">Código de Activación</label>
-                        <input type="text" id="code" required 
+                        <input type="text" id="code" 
                             class="w-full input-neon rounded-xl p-4 text-center tracking-[0.5em] uppercase font-mono text-sm"
                             placeholder="XXX-XXX">
                     </div>
                     
-                    <div id="msg-box" class="hidden p-3 rounded-xl text-xs text-center font-bold break-words"></div>
+                    <div id="msg-box" class="hidden p-3 rounded-xl text-xs text-center font-bold break-words animate-pulse"></div>
 
                     <button type="submit" id="btn-login" class="btn-neon w-full font-black py-4 rounded-xl shadow-xl transition flex justify-center items-center text-sm tracking-widest uppercase">
                         ENTRAR <i class="fas fa-chevron-right ml-3 text-xs"></i>
@@ -198,13 +232,108 @@
         </div>
         
         <p class="mt-12 text-[9px] text-green-800 text-center max-w-lg uppercase tracking-[0.2em] font-medium">
-            Tracks & Telemetry v3.0 <span class="mx-2">|</span> slotcarhome@gmail.com
+            TRACKSTELEMETRY v3.1 <span class="mx-2">|</span> slotcarhome@gmail.com
         </p>
     </div>
 
-    <iframe id="app-frame" src="about:blank"></iframe>
+    <!-- PANTALLA DASHBOARD (Sustituye al iframe) -->
+    <div id="app-dashboard">
+        <!-- Header Dashboard -->
+        <header class="sticky top-0 z-50 glass-panel border-b border-[#39ff14]/30 px-6 py-4 flex justify-between items-center">
+            <div class="flex items-center">
+                <i class="fas fa-satellite-dish text-[#39ff14] text-xl mr-3 animate-pulse"></i>
+                <h1 class="text-lg font-black tracking-widest text-white uppercase hidden md:block">T&T Data Center</h1>
+            </div>
+            <div class="flex items-center space-x-4">
+                <div class="text-[10px] text-right hidden sm:block">
+                    <div class="text-[#39ff14] font-bold">CONECTADO</div>
+                    <div class="text-gray-500 font-mono" id="connection-time">00:00:00</div>
+                </div>
+                <div class="h-8 w-8 rounded-full border border-[#39ff14] flex items-center justify-center bg-black/50">
+                    <i class="fas fa-user text-xs text-[#39ff14]"></i>
+                </div>
+            </div>
+        </header>
+
+        <!-- Contenido Principal -->
+        <main class="p-6 max-w-7xl mx-auto space-y-8">
+            
+            <!-- Stats Row -->
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div class="glass-panel p-4 rounded-xl border-l-4 border-l-[#39ff14]">
+                    <div class="text-[10px] text-gray-400 uppercase tracking-wider">Circuitos</div>
+                    <div class="text-2xl font-black text-white mt-1">127</div>
+                </div>
+                <div class="glass-panel p-4 rounded-xl border-l-4 border-l-blue-500">
+                    <div class="text-[10px] text-gray-400 uppercase tracking-wider">Sesiones</div>
+                    <div class="text-2xl font-black text-white mt-1">42</div>
+                </div>
+                <div class="glass-panel p-4 rounded-xl border-l-4 border-l-purple-500">
+                    <div class="text-[10px] text-gray-400 uppercase tracking-wider">Avg. Lap</div>
+                    <div class="text-2xl font-black text-white mt-1">12.4s</div>
+                </div>
+                <div class="glass-panel p-4 rounded-xl border-l-4 border-l-orange-500">
+                    <div class="text-[10px] text-gray-400 uppercase tracking-wider">Status</div>
+                    <div class="text-xl font-black text-[#39ff14] mt-1">ONLINE</div>
+                </div>
+            </div>
+
+            <!-- Gráfico y Lista -->
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                <!-- Gráfico -->
+                <div class="lg:col-span-2 neon-panel rounded-2xl p-6 bg-black/80">
+                    <h3 class="text-sm font-bold text-[#39ff14] mb-4 uppercase tracking-widest flex justify-between">
+                        <span>Telemetría en tiempo real</span>
+                        <i class="fas fa-chart-line"></i>
+                    </h3>
+                    <div class="relative h-64 w-full">
+                        <canvas id="telemetryChart"></canvas>
+                    </div>
+                </div>
+
+                <!-- Lista Circuitos -->
+                <div class="glass-panel rounded-2xl p-6">
+                    <h3 class="text-sm font-bold text-white mb-4 uppercase tracking-widest border-b border-gray-700 pb-2">
+                        Circuitos Recientes
+                    </h3>
+                    <div class="space-y-3 overflow-y-auto max-h-64 pr-2 custom-scrollbar">
+                        <!-- Items simulados -->
+                        <div class="track-card p-3 rounded-lg flex justify-between items-center cursor-pointer">
+                            <div>
+                                <div class="text-xs font-bold text-white">Jarama GT</div>
+                                <div class="text-[10px] text-gray-500">Última vuelta: 10.234s</div>
+                            </div>
+                            <i class="fas fa-chevron-right text-[#39ff14] text-xs"></i>
+                        </div>
+                        <div class="track-card p-3 rounded-lg flex justify-between items-center cursor-pointer">
+                            <div>
+                                <div class="text-xs font-bold text-white">Nürburgring Slot</div>
+                                <div class="text-[10px] text-gray-500">Última vuelta: 45.102s</div>
+                            </div>
+                            <i class="fas fa-chevron-right text-[#39ff14] text-xs"></i>
+                        </div>
+                        <div class="track-card p-3 rounded-lg flex justify-between items-center cursor-pointer">
+                            <div>
+                                <div class="text-xs font-bold text-white">Catalunya Rally</div>
+                                <div class="text-[10px] text-gray-500">Última vuelta: 14.880s</div>
+                            </div>
+                            <i class="fas fa-chevron-right text-[#39ff14] text-xs"></i>
+                        </div>
+                        <div class="track-card p-3 rounded-lg flex justify-between items-center cursor-pointer">
+                            <div>
+                                <div class="text-xs font-bold text-white">Monaco F1</div>
+                                <div class="text-[10px] text-gray-500">Última vuelta: 08.992s</div>
+                            </div>
+                            <i class="fas fa-chevron-right text-[#39ff14] text-xs"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
     
-    <button onclick="logout()" id="logout-btn" class="hidden fixed bottom-8 right-8 btn-neon w-14 h-14 rounded-2xl shadow-[0_0_20px_#39ff14] z-[100] flex items-center justify-center text-xl bg-black">
+    <!-- Botón Salir -->
+    <button onclick="logout()" id="logout-btn" class="hidden fixed bottom-8 right-8 btn-neon w-14 h-14 rounded-2xl shadow-[0_0_20px_#39ff14] z-[100] flex items-center justify-center text-xl bg-black hover:scale-110">
         <i class="fas fa-power-off"></i>
     </button>
 
@@ -213,26 +342,22 @@
         import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, collection, getDocs, query, where, doc, updateDoc, setDoc, onSnapshot, increment } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        const firebaseConfig = {
-          apiKey: "AIzaSyDW-2Yc4kvZJYbNOVeesPZWdRThYe0noUI",
-          authDomain: "correo-95e58.firebaseapp.com",
-          projectId: "correo-95e58",
-          storageBucket: "correo-95e58.firebasestorage.app",
-          messagingSenderId: "977860532946",
-          appId: "1:977860532946:web:3738c6b7165201bce7ab0b",
-          measurementId: "G-6DMG51VQ92"
-        };
+        // CONFIGURACIÓN DEL ENTORNO
+        const firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
+        const APP_ID = typeof __app_id !== 'undefined' ? __app_id : 'app_tracks'; // ID Adaptado
         
         const ADMIN_EMAIL = "slotcarhome@gmail.com"; 
-        const APP_FILENAME = "circuitos.html";
-        const APP_ID = "app_tracks";
         const APP_PRICE = "15 Euros";
 
+        // Inicialización
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
         const auth = getAuth(app);
         
-        signInAnonymously(auth).catch(err => console.warn("Aviso: Autenticación limitada en local.", err));
+        // Autenticación inicial (requerida por reglas)
+        signInAnonymously(auth).then(() => {
+            console.log("Conectado anónimamente a Firebase");
+        }).catch(err => console.warn("Error auth:", err));
 
         const mailLink = document.getElementById('mail-link');
         const emailInput = document.getElementById('email');
@@ -247,37 +372,47 @@
         
         function updateMailLink() {
             const userEmail = emailInput.value || "[tu correo]";
-            // Configuración exacta del correo
-            const subject = "Interés Licencia Tracks & Telemetry";
-            const body = `Hola, equipo de SLOTCARHOME,%0D%0A%0D%0AEstoy interesado en adquirir la licencia de Tracks & Telemetry por el Precio de ${APP_PRICE}%0D%0A%0D%0AQuedo a la espera de sus instrucciones para proceder con el pago.%0D%0A%0D%0AGracias y un saludo.`;
+            const subject = "Interés Licencia TRACKSTELEMETRY";
+            const body = `Hola, equipo de SLOTCARHOME,%0D%0A%0D%0AEstoy interesado en adquirir la licencia de TRACKSTELEMETRY por el Precio de ${APP_PRICE}%0D%0A%0D%0AQuedo a la espera de sus instrucciones para proceder con el pago.%0D%0A%0D%0AGracias y un saludo.`;
             mailLink.href = `mailto:${ADMIN_EMAIL}?subject=${subject}&body=${body}`;
         }
         emailInput.addEventListener('input', updateMailLink);
         updateMailLink();
 
+        // Registro de Clicks (simulado si no hay auth)
         mailLink.addEventListener('click', async () => {
-            try {
-                const statsRef = doc(db, 'artifacts', APP_ID, 'public', 'data', 'stats');
-                await setDoc(statsRef, { 
-                    purchase_clicks: increment(1),
-                    last_click: new Date().toISOString()
-                }, { merge: true });
-            } catch (e) {
-                console.warn("Click no registrado (Posible bloqueo local)", e);
+            if(auth.currentUser) {
+                try {
+                    const statsRef = doc(db, 'artifacts', APP_ID, 'public', 'data', 'stats');
+                    await setDoc(statsRef, { 
+                        purchase_clicks: increment(1),
+                        last_click: new Date().toISOString()
+                    }, { merge: true });
+                } catch (e) {
+                    console.log("Analytics click local (sin escritura)");
+                }
             }
         });
 
+        // --- LÓGICA DE LOGIN ---
         document.getElementById('login-form').addEventListener('submit', async (e) => {
             e.preventDefault();
             const email = emailInput.value.toLowerCase().trim();
             const code = document.getElementById('code').value.trim();
             const btn = document.getElementById('btn-login');
             
-            btn.innerHTML = '<i class="fas fa-circle-notch fa-spin"></i>'; btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-circle-notch fa-spin"></i> Verificando...'; btn.disabled = true;
             document.getElementById('msg-box').classList.add('hidden');
 
             try {
-                const q = query(collection(db, 'artifacts', APP_ID, 'public', 'data', 'access_codes'), where("email", "==", email), where("code", "==", code));
+                if (!auth.currentUser) await signInAnonymously(auth);
+
+                // Consulta DB (Ruta adaptada a reglas estrictas)
+                const q = query(
+                    collection(db, 'artifacts', APP_ID, 'public', 'data', 'access_codes'), 
+                    where("email", "==", email), 
+                    where("code", "==", code)
+                );
                 const querySnapshot = await getDocs(q);
 
                 if (!querySnapshot.empty) {
@@ -285,39 +420,44 @@
                     const userData = docSnap.data();
                     
                     if(userData.active === false) {
-                        showMessage("⛔ LICENCIA NO ACTIVA", "error");
+                        showMessage("⛔ LICENCIA DESACTIVADA", "error");
                     } else { 
-                        try {
-                            const sessionId = generateUUID();
-                            const docRef = doc(db, 'artifacts', APP_ID, 'public', 'data', 'access_codes', docSnap.id);
-
-                            await updateDoc(docRef, { 
-                                current_session: sessionId,
-                                last_login: new Date().toISOString()
-                            });
-
-                            localStorage.setItem('user_' + APP_ID, email);
-                            localStorage.setItem('doc_id_' + APP_ID, docSnap.id);
-                            localStorage.setItem('session_' + APP_ID, sessionId);
-
-                            monitorSession(docSnap.id);
-                            showApp(); 
-                        } catch (writeError) {
-                            console.error("Error escritura (Local):", writeError);
-                            console.warn("Entrando en modo sin protección de sesión (Fallo de escritura DB)");
-                            localStorage.setItem('user_' + APP_ID, email);
-                            showApp(); 
-                        }
+                        performLogin(email, docSnap.id);
                     }
                 } else {
                     showMessage("❌ DATOS INVÁLIDOS", "error");
                 }
             } catch (error) { 
                 console.error("Error Login:", error); 
-                showMessage("ERROR: " + error.message, "error"); 
+                showMessage("ERROR DB: " + error.message, "error"); 
             }
             btn.innerHTML = 'ENTRAR <i class="fas fa-chevron-right ml-3 text-xs"></i>'; btn.disabled = false;
         });
+
+        async function performLogin(email, docId) {
+             try {
+                const sessionId = generateUUID();
+                
+                // Actualizar DB para control de sesión
+                const docRef = doc(db, 'artifacts', APP_ID, 'public', 'data', 'access_codes', docId);
+                await updateDoc(docRef, { 
+                    current_session: sessionId,
+                    last_login: new Date().toISOString()
+                }).catch(e => console.warn("No se pudo escribir sesión (posiblemente falta permisos)", e));
+
+                localStorage.setItem('user_' + APP_ID, email);
+                localStorage.setItem('doc_id_' + APP_ID, docId);
+                localStorage.setItem('session_' + APP_ID, sessionId);
+
+                monitorSession(docId);
+                showApp(); 
+
+            } catch (e) {
+                console.error(e);
+                // Fallback login
+                showApp();
+            }
+        }
 
         function monitorSession(docId) {
             if (unsubscribeSession) unsubscribeSession();
@@ -341,35 +481,96 @@
         }
 
         function showApp() {
-            document.getElementById('auth-container').style.display = 'none';
-            document.getElementById('app-frame').src = APP_FILENAME;
-            document.getElementById('app-frame').style.display = 'block';
-            document.getElementById('logout-btn').classList.remove('hidden');
+            // Transición suave
+            const authContainer = document.getElementById('auth-container');
+            authContainer.style.opacity = '0';
+            setTimeout(() => {
+                authContainer.style.display = 'none';
+                const dashboard = document.getElementById('app-dashboard');
+                dashboard.style.display = 'block';
+                document.getElementById('logout-btn').classList.remove('hidden');
+                
+                // Iniciar gráfico simulado
+                initChart();
+                startTimer();
+            }, 500);
         }
 
         function forceLogout() {
             document.getElementById('session-alert').style.display = 'flex';
-            localStorage.removeItem('user_' + APP_ID); 
-            localStorage.removeItem('session_' + APP_ID);
-            localStorage.removeItem('doc_id_' + APP_ID);
-            document.getElementById('app-frame').src = 'about:blank';
+            clearSession();
         }
 
         window.logout = function() { 
             if (unsubscribeSession) unsubscribeSession();
-            localStorage.removeItem('user_' + APP_ID); 
-            localStorage.removeItem('session_' + APP_ID);
-            localStorage.removeItem('doc_id_' + APP_ID);
+            clearSession();
             location.reload(); 
         }
 
+        function clearSession() {
+            localStorage.removeItem('user_' + APP_ID); 
+            localStorage.removeItem('session_' + APP_ID);
+            localStorage.removeItem('doc_id_' + APP_ID);
+        }
+
+        // --- DASHBOARD LOGIC (SIMULACIÓN) ---
+        function startTimer() {
+            setInterval(() => {
+                const now = new Date();
+                document.getElementById('connection-time').innerText = now.toLocaleTimeString();
+            }, 1000);
+        }
+
+        function initChart() {
+            const ctx = document.getElementById('telemetryChart').getContext('2d');
+            
+            // Datos simulados
+            const labels = Array.from({length: 20}, (_, i) => i);
+            const dataPoints = Array.from({length: 20}, () => Math.random() * 10 + 20);
+
+            new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Velocidad (m/s)',
+                        data: dataPoints,
+                        borderColor: '#39ff14',
+                        backgroundColor: 'rgba(57, 255, 20, 0.1)',
+                        borderWidth: 2,
+                        tension: 0.4,
+                        pointRadius: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false }
+                    },
+                    scales: {
+                        x: { display: false },
+                        y: { 
+                            grid: { color: 'rgba(255,255,255,0.1)' },
+                            ticks: { color: '#666', font: {size: 10} } 
+                        }
+                    },
+                    animation: {
+                        duration: 2000,
+                        easing: 'easeOutQuart'
+                    }
+                }
+            });
+        }
+
+        // Auto-login check
         const savedUser = localStorage.getItem('user_' + APP_ID);
         const savedDocId = localStorage.getItem('doc_id_' + APP_ID);
 
         if(savedUser && savedDocId) {
             showApp();
             monitorSession(savedDocId);
-        } else if (savedUser) window.logout(); 
+        }
     </script>
 </body>
 </html>
