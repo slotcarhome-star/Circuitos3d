@@ -48,6 +48,10 @@
             transition: all 0.3s ease;
             box-shadow: 0 0 10px rgba(57, 255, 20, 0.1);
             cursor: pointer;
+            text-align: center;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
         .btn-neon:hover {
             background: #39ff14;
@@ -127,6 +131,11 @@
             border-color: #39ff14;
             box-shadow: 0 0 15px rgba(57, 255, 20, 0.1);
         }
+        
+        /* Enlace de correo robusto */
+        a#mail-link {
+            text-decoration: none;
+        }
     </style>
 </head>
 <body class="min-h-screen">
@@ -147,6 +156,7 @@
     <div id="auth-container" class="min-h-screen flex flex-col items-center justify-center p-4 md:p-6 transition-opacity duration-500">
         
         <div class="text-center mb-8 md:mb-10 mt-4">
+            <!-- Título visual: TRACKS & TELEMETRY -->
             <h1 class="text-3xl md:text-4xl font-black tracking-tighter neon-text uppercase">TRACKS & TELEMETRY</h1>
             <div class="h-1 w-20 md:w-24 bg-gradient-to-r from-transparent via-[#39ff14] to-transparent mx-auto mt-1"></div>
             <p class="text-green-600 text-[9px] md:text-[10px] uppercase tracking-[0.3em] mt-2 font-bold">Pro Edition / Data Analysis</p>
@@ -193,7 +203,8 @@
                     </div>
                 </div>
 
-                <a id="mail-link" href="#" class="block w-full bg-[#39ff14] hover:bg-[#32cd11] text-black font-black py-4 rounded-xl text-center shadow-[0_0_20px_rgba(57,255,20,0.4)] transition duration-300 transform hover:scale-[1.02] text-sm tracking-widest uppercase">
+                <!-- IMPORTANTE: target="_blank" asegura que el cliente de correo se abra -->
+                <a id="mail-link" href="#" target="_blank" class="block w-full bg-[#39ff14] hover:bg-[#32cd11] text-black font-black py-4 rounded-xl text-center shadow-[0_0_20px_rgba(57,255,20,0.4)] transition duration-300 transform hover:scale-[1.02] text-sm tracking-widest uppercase flex items-center justify-center">
                     SOLICITAR AHORA (15€)
                 </a>
             </div>
@@ -231,6 +242,7 @@
             </div>
         </div>
         
+        <!-- Footer: TRACKSTELEMETRY -->
         <p class="mt-12 text-[9px] text-green-800 text-center max-w-lg uppercase tracking-[0.2em] font-medium">
             TRACKSTELEMETRY v3.1 <span class="mx-2">|</span> slotcarhome@gmail.com
         </p>
@@ -372,6 +384,8 @@
         
         function updateMailLink() {
             const userEmail = emailInput.value || "[tu correo]";
+            // Título del correo: Interés Licencia TRACKSTELEMETRY
+            // Cuerpo del correo: TRACKSTELEMETRY
             const subject = "Interés Licencia TRACKSTELEMETRY";
             const body = `Hola, equipo de SLOTCARHOME,%0D%0A%0D%0AEstoy interesado en adquirir la licencia de TRACKSTELEMETRY por el Precio de ${APP_PRICE}%0D%0A%0D%0AQuedo a la espera de sus instrucciones para proceder con el pago.%0D%0A%0D%0AGracias y un saludo.`;
             mailLink.href = `mailto:${ADMIN_EMAIL}?subject=${subject}&body=${body}`;
@@ -379,8 +393,14 @@
         emailInput.addEventListener('input', updateMailLink);
         updateMailLink();
 
-        // Registro de Clicks (simulado si no hay auth)
-        mailLink.addEventListener('click', async () => {
+        // Registro de Clicks y Fuerza Apertura
+        mailLink.addEventListener('click', async (e) => {
+            // Asegurar que se abra en nueva pestaña si el href falla por seguridad
+            if (!mailLink.href.startsWith('mailto:')) {
+                updateMailLink();
+            }
+            
+            // Analytics
             if(auth.currentUser) {
                 try {
                     const statsRef = doc(db, 'artifacts', APP_ID, 'public', 'data', 'stats');
