@@ -3,82 +3,106 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Tracks & Telemetry - Acceso Profesional</title>
+    <title>TrackTelemetry - Acceso Oficial</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
-    <!-- Chart.js para simulación de telemetría -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-
     <style>
-        /* --- ESTILOS GENERALES --- */
+        :root {
+            --neon-green: #39ff14;
+            --dark-bg: #0a0a0a;
+        }
+
         body { 
             background: linear-gradient(180deg, #000000 0%, #051a05 50%, #0a290a 100%);
-            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; 
+            font-family: sans-serif; 
             color: #f0fdf4;
-            overflow-x: hidden;
         }
 
-        /* --- ESTÉTICA NEÓN --- */
-        .neon-panel {
-            background: linear-gradient(145deg, #111 0%, #0a0a0a 45%, #050505 100%);
+        /* Separador "Currado" - Efecto Láser */
+        .laser-separator {
+            position: relative;
+            width: 100%;
+            max-width: 300px;
+            height: 2px;
+            margin: 1.5rem auto;
+            background: linear-gradient(90deg, transparent 0%, rgba(57, 255, 20, 0.5) 50%, transparent 100%);
+        }
+        
+        /* Núcleo brillante */
+        .laser-separator::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 40%;
+            height: 3px;
+            background: #39ff14;
+            border-radius: 100%;
+            box-shadow: 0 0 10px #39ff14, 0 0 20px #39ff14;
+            opacity: 0.8;
+        }
+
+        /* Resplandor animado */
+        .laser-separator::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 60%;
+            height: 10px;
+            background: #39ff14;
+            filter: blur(8px);
+            opacity: 0.3;
+            animation: pulse-width 3s infinite ease-in-out;
+        }
+
+        @keyframes pulse-width {
+            0%, 100% { width: 60%; opacity: 0.3; }
+            50% { width: 80%; opacity: 0.5; }
+        }
+
+        /* Panel Izquierdo */
+        .neon-panel-solid {
+            background: linear-gradient(145deg, #1a1a1a 0%, #0d0d0d 45%, #000000 55%, #0d0d0d 100%);
             border: 1px solid #39ff14;
             box-shadow: 0 0 20px rgba(57, 255, 20, 0.15), inset 0 0 15px rgba(57, 255, 20, 0.05);
-            color: #e2e8f0;
-        }
-
-        .glass-panel {
-            background: linear-gradient(180deg, rgba(20, 255, 50, 0.05) 0%, rgba(0, 0, 0, 0.4) 100%);
-            backdrop-filter: blur(12px);
-            border: 1px solid rgba(57, 255, 20, 0.3);
-            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.5);
-        }
-
-        .neon-text {
             color: #39ff14;
-            text-shadow: 0 0 10px rgba(57, 255, 20, 0.5);
-            background: linear-gradient(180deg, #ccffcc 0%, #39ff14 60%, #008f00 100%);
+        }
+
+        /* Panel Derecho */
+        .neon-panel-glass {
+            background: linear-gradient(180deg, rgba(20, 50, 20, 0.25) 0%, rgba(0, 20, 0, 0.4) 100%);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(57, 255, 20, 0.4);
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.8);
+        }
+
+        .neon-text-gradient {
+            background: linear-gradient(180deg, #ccffcc 0%, #39ff14 50%, #00cc00 100%);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
+            filter: drop-shadow(0 0 5px rgba(57, 255, 20, 0.5));
         }
 
         .btn-neon {
-            background: linear-gradient(180deg, #1a1a1a 0%, #000000 100%);
+            background: linear-gradient(180deg, #0f2e0f 0%, #000000 100%);
             color: #39ff14;
             border: 1px solid #39ff14;
             transition: all 0.3s ease;
-            box-shadow: 0 0 10px rgba(57, 255, 20, 0.1);
-            cursor: pointer;
-            text-align: center;
-            display: flex;
-            align-items: center;
-            justify-content: center;
+            box-shadow: 0 0 5px rgba(57, 255, 20, 0.2);
         }
         .btn-neon:hover {
-            background: #39ff14;
-            color: #000000;
+            background: linear-gradient(180deg, #39ff14 0%, #1a8009 100%);
+            color: black;
             transform: translateY(-2px);
             box-shadow: 0 0 25px rgba(57, 255, 20, 0.6);
-        }
-        .btn-neon:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-            transform: none;
+            border-color: #fff;
         }
 
-        .input-neon {
-            background: rgba(0, 20, 0, 0.6);
-            border: 1px solid #1a4d1a;
-            color: #39ff14;
-            transition: all 0.3s;
-        }
-        .input-neon:focus {
-            border-color: #39ff14;
-            box-shadow: 0 0 15px rgba(57, 255, 20, 0.3);
-            outline: none;
-        }
-        .input-neon::placeholder { color: #1a4d1a; }
-
-        /* --- IMAGEN --- */
+        #app-frame { width: 100vw; height: 100vh; border: none; display: none; background: black; }
+        
         .img-container {
             width: 100%;
             max-width: 240px;
@@ -89,18 +113,33 @@
         .aspect-9-16 {
             width: 100%;
             aspect-ratio: 9 / 16;
+            object-fit: cover;
             border-radius: 1rem;
-            box-shadow: 0 0 30px rgba(57, 255, 20, 0.2);
-            border: 2px solid #39ff14;
-            background: #050505;
+            box-shadow: 0 0 30px rgba(57, 255, 20, 0.1);
+            border: 3px solid #1a472a;
+            background: #000;
             display: flex;
             align-items: center;
             justify-content: center;
             overflow: hidden;
-            position: relative;
         }
 
-        /* --- MODAL --- */
+        .input-neon {
+            background: rgba(0, 20, 0, 0.6);
+            border: 1px solid #1a472a;
+            color: #39ff14;
+            transition: all 0.3s;
+        }
+        .input-neon:focus {
+            border-color: #39ff14;
+            box-shadow: 0 0 15px rgba(57, 255, 20, 0.3);
+            outline: none;
+            background: rgba(0, 30, 0, 0.8);
+        }
+        .input-neon::placeholder {
+            color: rgba(57, 255, 20, 0.3);
+        }
+
         #session-alert {
             display: none;
             position: fixed;
@@ -111,129 +150,97 @@
             justify-content: center;
             backdrop-filter: blur(5px);
         }
-
-        /* --- DASHBOARD INTERNO (Reemplaza al iframe) --- */
-        #app-dashboard {
-            display: none;
-            width: 100%;
-            min-height: 100vh;
-            background-color: #050505;
-            position: relative;
-            padding-bottom: 80px;
-        }
-
-        .track-card {
-            background: rgba(20, 20, 20, 0.8);
-            border: 1px solid #333;
-            transition: 0.3s;
-        }
-        .track-card:hover {
-            border-color: #39ff14;
-            box-shadow: 0 0 15px rgba(57, 255, 20, 0.1);
-        }
-        
-        /* Enlace de correo robusto */
-        a#mail-link {
-            text-decoration: none;
-        }
     </style>
 </head>
-<body class="min-h-screen">
+<body class="min-h-screen overflow-y-auto">
 
     <!-- Modal de Sesión Duplicada -->
     <div id="session-alert">
-        <div class="glass-panel p-8 rounded-2xl max-w-sm text-center border-red-500/50" style="box-shadow: 0 0 30px rgba(220, 38, 38, 0.2);">
-            <i class="fas fa-exclamation-triangle text-4xl text-red-500 mb-4"></i>
+        <div class="neon-panel-glass p-8 rounded-2xl max-w-sm text-center border-red-500/50">
+            <i class="fas fa-user-shield text-4xl text-red-500 mb-4 drop-shadow-[0_0_10px_rgba(239,68,68,0.5)]"></i>
             <h3 class="text-xl font-bold text-white mb-2">Sesión Finalizada</h3>
-            <p class="text-sm text-slate-300 mb-6">Se ha detectado un inicio de sesión en otro dispositivo.</p>
-            <button onclick="location.reload()" class="btn-neon w-full py-3 rounded-xl font-bold text-xs uppercase tracking-widest border-red-500 text-red-500 hover:bg-red-500 hover:text-white hover:border-red-500 hover:shadow-red-500/50">
+            <p class="text-sm text-gray-400 mb-6">Se ha detectado un inicio de sesión en otro dispositivo.</p>
+            <button onclick="location.reload()" class="btn-neon w-full py-3 rounded-xl font-bold text-xs uppercase tracking-widest border-red-500 text-red-500 hover:bg-red-500 hover:text-white hover:shadow-[0_0_20px_rgba(239,68,68,0.5)]">
                 Entendido
             </button>
         </div>
     </div>
 
-    <!-- PANTALLA DE LOGIN -->
-    <div id="auth-container" class="min-h-screen flex flex-col items-center justify-center p-4 md:p-6 transition-opacity duration-500">
+    <div id="auth-container" class="min-h-screen flex flex-col items-center justify-center p-4 md:p-6">
         
-        <div class="text-center mb-8 md:mb-10 mt-4">
-            <!-- Título visual: TRACKS & TELEMETRY -->
-            <h1 class="text-3xl md:text-4xl font-black tracking-tighter neon-text uppercase">TRACKS & TELEMETRY</h1>
-            <div class="h-1 w-20 md:w-24 bg-gradient-to-r from-transparent via-[#39ff14] to-transparent mx-auto mt-1"></div>
-            <p class="text-green-600 text-[9px] md:text-[10px] uppercase tracking-[0.3em] mt-2 font-bold">Pro Edition / Data Analysis</p>
+        <div class="text-center mb-8 md:mb-10 mt-4 w-full">
+            <!-- Título Actualizado -->
+            <h1 class="text-3xl md:text-5xl font-black tracking-tighter neon-text-gradient uppercase">TRACKS & TELEMETRY</h1>
+            
+            <!-- Separador "Currado" -->
+            <div class="laser-separator"></div>
+            
+            <p class="text-[#39ff14]/70 text-[9px] md:text-[10px] uppercase tracking-[0.3em] mt-2 font-bold">Creación de Circuitos y Telemetria</p>
         </div>
 
         <div class="img-container">
-            <div class="aspect-9-16 relative group">
-                <!-- Fallback visual usando FontAwesome si no hay imagen -->
-                <div class="absolute inset-0 flex flex-col items-center justify-center bg-black/80 z-0">
-                    <i class="fas fa-route text-6xl text-[#39ff14] opacity-20 mb-4 animate-pulse"></i>
-                    <div class="w-full h-32 absolute bottom-0 bg-gradient-to-t from-[#39ff14]/10 to-transparent"></div>
-                    <!-- Grid Lines simulación -->
-                    <div class="absolute inset-0 opacity-10" style="background-image: linear-gradient(#39ff14 1px, transparent 1px), linear-gradient(90deg, #39ff14 1px, transparent 1px); background-size: 20px 20px;"></div>
-                </div>
-                
+            <div class="aspect-9-16 shadow-[0_0_30px_rgba(57,255,20,0.15)]">
                 <img id="user-image" src="tracks.jpg" 
-                     alt="Portada" 
-                     class="w-full h-full object-cover relative z-10"
-                     onerror="this.style.display='none';">
+                     alt="[Imagen de TrackTelemetry]" 
+                     class="w-full h-full object-cover"
+                     onerror="this.style.display='none'; document.getElementById('placeholder').style.display='flex';">
+                
+                <div id="placeholder" class="flex flex-col items-center justify-center p-5 text-center text-[#1a472a]" style="display: none;">
+                    <i class="fas fa-route text-5xl mb-4 opacity-50 text-[#39ff14]"></i>
+                    <p class="text-xs font-bold uppercase tracking-widest text-[#39ff14]">tracks.jpg</p>
+                </div>
             </div>
         </div>
 
         <div class="w-full max-w-4xl grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8 items-stretch">
 
-            <!-- Panel Compra -->
-            <div class="neon-panel rounded-3xl p-6 md:p-8 relative flex flex-col justify-between transform transition hover:scale-[1.01]">
-                <div class="absolute -top-3 -right-3 bg-black text-[#39ff14] text-[9px] font-bold px-3 py-1 rounded-full border border-[#39ff14] shadow-[0_0_10px_#39ff14]">LICENCIA PRO</div>
+            <div class="neon-panel-solid rounded-3xl p-6 md:p-8 relative flex flex-col justify-between">
+                <div class="absolute -top-3 -right-3 bg-black text-[#39ff14] text-[9px] font-bold px-3 py-1 rounded-full border border-[#39ff14] shadow-[0_0_15px_#39ff14]">LICENCIA PREMIUM</div>
                 
                 <div>
                     <h2 class="text-lg md:text-xl font-black mb-4 flex items-center text-white">
-                        <i class="fas fa-cart-shopping mr-3 opacity-70 text-[#39ff14]"></i> ADQUISICIÓN
+                        <i class="fas fa-shield-halved mr-3 text-[#39ff14]"></i> ADQUISICIÓN
                     </h2>
                     
                     <p class="text-gray-300 text-sm mb-6 leading-relaxed font-medium">
-                        Acceso completo a la base de datos de circuitos y telemetría avanzada.
+                        Herramienta profesional de diseño y telemetría. Un solo pago de 15€, control total de por vida.
                     </p>
 
                     <div class="bg-black/40 rounded-2xl p-5 border border-[#39ff14]/30 mb-6">
                         <ul class="text-xs space-y-3 text-white font-bold">
-                            <li class="flex items-center"><i class="fas fa-check-circle mr-2 text-[#39ff14]"></i> Base de Datos Mundial</li>
+                            <li class="flex items-center"><i class="fas fa-check-circle mr-2 text-[#39ff14]"></i> Solicita acceso vía Email</li>
                             <li class="flex items-center"><i class="fas fa-check-circle mr-2 text-[#39ff14]"></i> Pago único de 15,00€</li>
-                            <li class="flex items-center"><i class="fas fa-check-circle mr-2 text-[#39ff14]"></i> Acceso ilimitado</li>
+                            <li class="flex items-center"><i class="fas fa-check-circle mr-2 text-[#39ff14]"></i> Activación inmediata</li>
                         </ul>
                     </div>
                 </div>
 
-                <!-- IMPORTANTE: target="_blank" asegura que el cliente de correo se abra -->
-                <a id="mail-link" href="#" target="_blank" class="block w-full bg-[#39ff14] hover:bg-[#32cd11] text-black font-black py-4 rounded-xl text-center shadow-[0_0_20px_rgba(57,255,20,0.4)] transition duration-300 transform hover:scale-[1.02] text-sm tracking-widest uppercase flex items-center justify-center">
+                <a id="mail-link" href="#" class="block w-full btn-neon font-black py-4 rounded-xl text-center shadow-2xl text-sm tracking-widest uppercase">
                     SOLICITAR AHORA (15€)
                 </a>
             </div>
 
-            <!-- Panel Login -->
-            <div class="glass-panel rounded-3xl p-6 md:p-8 flex flex-col relative overflow-hidden">
-                <!-- Efecto brillo fondo -->
-                <div class="absolute top-0 right-0 w-32 h-32 bg-[#39ff14] opacity-5 rounded-full blur-3xl -mr-10 -mt-10"></div>
-
-                <h2 class="text-lg md:text-xl font-bold text-white mb-6 flex items-center neon-text">
-                    <i class="fas fa-fingerprint mr-3"></i> ACCESO CLIENTE
+            <div class="neon-panel-glass rounded-3xl p-6 md:p-8 flex flex-col">
+                <h2 class="text-lg md:text-xl font-bold text-white mb-6 flex items-center neon-text-gradient">
+                    <i class="fas fa-lock-open mr-3"></i> ACCESO CLIENTE
                 </h2>
 
-                <form id="login-form" class="space-y-6 flex-grow z-10">
+                <form id="login-form" class="space-y-6 flex-grow">
                     <div>
-                        <label class="block text-[10px] font-black text-green-500 uppercase mb-2 tracking-widest">Identificación</label>
+                        <label class="block text-[10px] font-black text-[#39ff14] uppercase mb-2 tracking-widest">Identificación</label>
                         <input type="email" id="email" required 
                             class="w-full input-neon rounded-xl p-4 text-sm"
                             placeholder="tu@email.com">
                     </div>
 
                     <div>
-                        <label class="block text-[10px] font-black text-green-500 uppercase mb-2 tracking-widest">Código de Activación</label>
-                        <input type="text" id="code" 
+                        <label class="block text-[10px] font-black text-[#39ff14] uppercase mb-2 tracking-widest">Código de Activación</label>
+                        <input type="text" id="code" required 
                             class="w-full input-neon rounded-xl p-4 text-center tracking-[0.5em] uppercase font-mono text-sm"
                             placeholder="XXX-XXX">
                     </div>
                     
-                    <div id="msg-box" class="hidden p-3 rounded-xl text-xs text-center font-bold break-words animate-pulse"></div>
+                    <div id="msg-box" class="hidden p-3 rounded-xl text-xs text-center font-bold break-words"></div>
 
                     <button type="submit" id="btn-login" class="btn-neon w-full font-black py-4 rounded-xl shadow-xl transition flex justify-center items-center text-sm tracking-widest uppercase">
                         ENTRAR <i class="fas fa-chevron-right ml-3 text-xs"></i>
@@ -242,110 +249,14 @@
             </div>
         </div>
         
-        <!-- Footer: TRACKSTELEMETRY -->
-        <p class="mt-12 text-[9px] text-green-800 text-center max-w-lg uppercase tracking-[0.2em] font-medium">
-            TRACKSTELEMETRY v3.1 <span class="mx-2">|</span> slotcarhome@gmail.com
+        <p class="mt-12 text-[9px] text-[#39ff14]/50 text-center max-w-lg uppercase tracking-[0.2em] font-medium">
+            Tracks & Telemetry v1.0 <span class="mx-2">|</span> slotcarhome@gmail.com
         </p>
     </div>
 
-    <!-- PANTALLA DASHBOARD (Sustituye al iframe) -->
-    <div id="app-dashboard">
-        <!-- Header Dashboard -->
-        <header class="sticky top-0 z-50 glass-panel border-b border-[#39ff14]/30 px-6 py-4 flex justify-between items-center">
-            <div class="flex items-center">
-                <i class="fas fa-satellite-dish text-[#39ff14] text-xl mr-3 animate-pulse"></i>
-                <h1 class="text-lg font-black tracking-widest text-white uppercase hidden md:block">T&T Data Center</h1>
-            </div>
-            <div class="flex items-center space-x-4">
-                <div class="text-[10px] text-right hidden sm:block">
-                    <div class="text-[#39ff14] font-bold">CONECTADO</div>
-                    <div class="text-gray-500 font-mono" id="connection-time">00:00:00</div>
-                </div>
-                <div class="h-8 w-8 rounded-full border border-[#39ff14] flex items-center justify-center bg-black/50">
-                    <i class="fas fa-user text-xs text-[#39ff14]"></i>
-                </div>
-            </div>
-        </header>
-
-        <!-- Contenido Principal -->
-        <main class="p-6 max-w-7xl mx-auto space-y-8">
-            
-            <!-- Stats Row -->
-            <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div class="glass-panel p-4 rounded-xl border-l-4 border-l-[#39ff14]">
-                    <div class="text-[10px] text-gray-400 uppercase tracking-wider">Circuitos</div>
-                    <div class="text-2xl font-black text-white mt-1">127</div>
-                </div>
-                <div class="glass-panel p-4 rounded-xl border-l-4 border-l-blue-500">
-                    <div class="text-[10px] text-gray-400 uppercase tracking-wider">Sesiones</div>
-                    <div class="text-2xl font-black text-white mt-1">42</div>
-                </div>
-                <div class="glass-panel p-4 rounded-xl border-l-4 border-l-purple-500">
-                    <div class="text-[10px] text-gray-400 uppercase tracking-wider">Avg. Lap</div>
-                    <div class="text-2xl font-black text-white mt-1">12.4s</div>
-                </div>
-                <div class="glass-panel p-4 rounded-xl border-l-4 border-l-orange-500">
-                    <div class="text-[10px] text-gray-400 uppercase tracking-wider">Status</div>
-                    <div class="text-xl font-black text-[#39ff14] mt-1">ONLINE</div>
-                </div>
-            </div>
-
-            <!-- Gráfico y Lista -->
-            <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                <!-- Gráfico -->
-                <div class="lg:col-span-2 neon-panel rounded-2xl p-6 bg-black/80">
-                    <h3 class="text-sm font-bold text-[#39ff14] mb-4 uppercase tracking-widest flex justify-between">
-                        <span>Telemetría en tiempo real</span>
-                        <i class="fas fa-chart-line"></i>
-                    </h3>
-                    <div class="relative h-64 w-full">
-                        <canvas id="telemetryChart"></canvas>
-                    </div>
-                </div>
-
-                <!-- Lista Circuitos -->
-                <div class="glass-panel rounded-2xl p-6">
-                    <h3 class="text-sm font-bold text-white mb-4 uppercase tracking-widest border-b border-gray-700 pb-2">
-                        Circuitos Recientes
-                    </h3>
-                    <div class="space-y-3 overflow-y-auto max-h-64 pr-2 custom-scrollbar">
-                        <!-- Items simulados -->
-                        <div class="track-card p-3 rounded-lg flex justify-between items-center cursor-pointer">
-                            <div>
-                                <div class="text-xs font-bold text-white">Jarama GT</div>
-                                <div class="text-[10px] text-gray-500">Última vuelta: 10.234s</div>
-                            </div>
-                            <i class="fas fa-chevron-right text-[#39ff14] text-xs"></i>
-                        </div>
-                        <div class="track-card p-3 rounded-lg flex justify-between items-center cursor-pointer">
-                            <div>
-                                <div class="text-xs font-bold text-white">Nürburgring Slot</div>
-                                <div class="text-[10px] text-gray-500">Última vuelta: 45.102s</div>
-                            </div>
-                            <i class="fas fa-chevron-right text-[#39ff14] text-xs"></i>
-                        </div>
-                        <div class="track-card p-3 rounded-lg flex justify-between items-center cursor-pointer">
-                            <div>
-                                <div class="text-xs font-bold text-white">Catalunya Rally</div>
-                                <div class="text-[10px] text-gray-500">Última vuelta: 14.880s</div>
-                            </div>
-                            <i class="fas fa-chevron-right text-[#39ff14] text-xs"></i>
-                        </div>
-                        <div class="track-card p-3 rounded-lg flex justify-between items-center cursor-pointer">
-                            <div>
-                                <div class="text-xs font-bold text-white">Monaco F1</div>
-                                <div class="text-[10px] text-gray-500">Última vuelta: 08.992s</div>
-                            </div>
-                            <i class="fas fa-chevron-right text-[#39ff14] text-xs"></i>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </main>
-    </div>
+    <iframe id="app-frame" src="about:blank"></iframe>
     
-    <!-- Botón Salir -->
-    <button onclick="logout()" id="logout-btn" class="hidden fixed bottom-8 right-8 btn-neon w-14 h-14 rounded-2xl shadow-[0_0_20px_#39ff14] z-[100] flex items-center justify-center text-xl bg-black hover:scale-110">
+    <button onclick="logout()" id="logout-btn" class="hidden fixed bottom-8 right-8 btn-neon w-14 h-14 rounded-2xl shadow-2xl z-[100] flex items-center justify-center text-xl border-2 border-[#39ff14] bg-black">
         <i class="fas fa-power-off"></i>
     </button>
 
@@ -354,22 +265,25 @@
         import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, collection, getDocs, query, where, doc, updateDoc, setDoc, onSnapshot, increment } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        // CONFIGURACIÓN DEL ENTORNO
-        const firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
-        const APP_ID = typeof __app_id !== 'undefined' ? __app_id : 'app_tracks'; // ID Adaptado
+        const firebaseConfig = {
+          apiKey: "AIzaSyDW-2Yc4kvZJYbNOVeesPZWdRThYe0noUI",
+          authDomain: "correo-95e58.firebaseapp.com",
+          projectId: "correo-95e58",
+          storageBucket: "correo-95e58.firebasestorage.app",
+          messagingSenderId: "977860532946",
+          appId: "1:977860532946:web:3738c6b7165201bce7ab0b",
+          measurementId: "G-6DMG51VQ92"
+        };
         
         const ADMIN_EMAIL = "slotcarhome@gmail.com"; 
-        const APP_PRICE = "15 Euros";
+        const APP_FILENAME = "circuitos.html"; 
+        const APP_ID = "app_tracks"; 
 
-        // Inicialización
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
         const auth = getAuth(app);
         
-        // Autenticación inicial (requerida por reglas)
-        signInAnonymously(auth).then(() => {
-            console.log("Conectado anónimamente a Firebase");
-        }).catch(err => console.warn("Error auth:", err));
+        signInAnonymously(auth).catch(err => console.warn("Modo offline/local.", err));
 
         const mailLink = document.getElementById('mail-link');
         const emailInput = document.getElementById('email');
@@ -384,55 +298,37 @@
         
         function updateMailLink() {
             const userEmail = emailInput.value || "[tu correo]";
-            // Título del correo: Interés Licencia TRACKSTELEMETRY
-            // Cuerpo del correo: TRACKSTELEMETRY
-            const subject = "Interés Licencia TRACKSTELEMETRY";
-            const body = `Hola, equipo de SLOTCARHOME,%0D%0A%0D%0AEstoy interesado en adquirir la licencia de TRACKSTELEMETRY por el Precio de ${APP_PRICE}%0D%0A%0D%0AQuedo a la espera de sus instrucciones para proceder con el pago.%0D%0A%0D%0AGracias y un saludo.`;
+            // Asunto del correo actualizado
+            const subject = "Interés Licencia Tracks & Telemetry";
+            const body = `Hola, equipo de SLOTCARHOME,%0D%0A%0D%0AEstoy interesado en adquirir la licencia de Tracks & Telemetry por el Precio de 15 Euros%0D%0A%0D%0AQuedo a la espera de sus instrucciones para proceder con el pago.%0D%0A%0D%0AGracias y un saludo.`;
             mailLink.href = `mailto:${ADMIN_EMAIL}?subject=${subject}&body=${body}`;
         }
         emailInput.addEventListener('input', updateMailLink);
         updateMailLink();
 
-        // Registro de Clicks y Fuerza Apertura
-        mailLink.addEventListener('click', async (e) => {
-            // Asegurar que se abra en nueva pestaña si el href falla por seguridad
-            if (!mailLink.href.startsWith('mailto:')) {
-                updateMailLink();
-            }
-            
-            // Analytics
-            if(auth.currentUser) {
-                try {
-                    const statsRef = doc(db, 'artifacts', APP_ID, 'public', 'data', 'stats');
-                    await setDoc(statsRef, { 
-                        purchase_clicks: increment(1),
-                        last_click: new Date().toISOString()
-                    }, { merge: true });
-                } catch (e) {
-                    console.log("Analytics click local (sin escritura)");
-                }
+        mailLink.addEventListener('click', async () => {
+            try {
+                const statsRef = doc(db, 'artifacts', APP_ID, 'public', 'data', 'stats');
+                await setDoc(statsRef, { 
+                    purchase_clicks: increment(1),
+                    last_click: new Date().toISOString()
+                }, { merge: true });
+            } catch (e) {
+                console.warn("Click local no persistido", e);
             }
         });
 
-        // --- LÓGICA DE LOGIN ---
         document.getElementById('login-form').addEventListener('submit', async (e) => {
             e.preventDefault();
             const email = emailInput.value.toLowerCase().trim();
             const code = document.getElementById('code').value.trim();
             const btn = document.getElementById('btn-login');
             
-            btn.innerHTML = '<i class="fas fa-circle-notch fa-spin"></i> Verificando...'; btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-circle-notch fa-spin"></i>'; btn.disabled = true;
             document.getElementById('msg-box').classList.add('hidden');
 
             try {
-                if (!auth.currentUser) await signInAnonymously(auth);
-
-                // Consulta DB (Ruta adaptada a reglas estrictas)
-                const q = query(
-                    collection(db, 'artifacts', APP_ID, 'public', 'data', 'access_codes'), 
-                    where("email", "==", email), 
-                    where("code", "==", code)
-                );
+                const q = query(collection(db, 'artifacts', APP_ID, 'public', 'data', 'access_codes'), where("email", "==", email), where("code", "==", code));
                 const querySnapshot = await getDocs(q);
 
                 if (!querySnapshot.empty) {
@@ -442,42 +338,36 @@
                     if(userData.active === false) {
                         showMessage("⛔ LICENCIA DESACTIVADA", "error");
                     } else { 
-                        performLogin(email, docSnap.id);
+                        try {
+                            const sessionId = generateUUID();
+                            const docRef = doc(db, 'artifacts', APP_ID, 'public', 'data', 'access_codes', docSnap.id);
+
+                            await updateDoc(docRef, { 
+                                current_session: sessionId,
+                                last_login: new Date().toISOString()
+                            });
+
+                            localStorage.setItem('user_' + APP_ID, email);
+                            localStorage.setItem('doc_id_' + APP_ID, docSnap.id);
+                            localStorage.setItem('session_' + APP_ID, sessionId);
+
+                            monitorSession(docSnap.id);
+                            showApp(); 
+                        } catch (writeError) {
+                            console.warn("Modo lectura local activado");
+                            localStorage.setItem('user_' + APP_ID, email);
+                            showApp(); 
+                        }
                     }
                 } else {
-                    showMessage("❌ DATOS INVÁLIDOS", "error");
+                    showMessage("❌ CREDENCIALES INVÁLIDAS", "error");
                 }
             } catch (error) { 
-                console.error("Error Login:", error); 
-                showMessage("ERROR DB: " + error.message, "error"); 
+                console.error("Error:", error); 
+                showMessage("ERROR DEL SISTEMA: " + error.message, "error"); 
             }
             btn.innerHTML = 'ENTRAR <i class="fas fa-chevron-right ml-3 text-xs"></i>'; btn.disabled = false;
         });
-
-        async function performLogin(email, docId) {
-             try {
-                const sessionId = generateUUID();
-                
-                // Actualizar DB para control de sesión
-                const docRef = doc(db, 'artifacts', APP_ID, 'public', 'data', 'access_codes', docId);
-                await updateDoc(docRef, { 
-                    current_session: sessionId,
-                    last_login: new Date().toISOString()
-                }).catch(e => console.warn("No se pudo escribir sesión (posiblemente falta permisos)", e));
-
-                localStorage.setItem('user_' + APP_ID, email);
-                localStorage.setItem('doc_id_' + APP_ID, docId);
-                localStorage.setItem('session_' + APP_ID, sessionId);
-
-                monitorSession(docId);
-                showApp(); 
-
-            } catch (e) {
-                console.error(e);
-                // Fallback login
-                showApp();
-            }
-        }
 
         function monitorSession(docId) {
             if (unsubscribeSession) unsubscribeSession();
@@ -489,108 +379,47 @@
                     if (data && data.current_session && data.current_session !== localSession) {
                         forceLogout();
                     }
-                }, (error) => { console.warn("Monitor desconectado:", error); });
-            } catch (e) { console.warn("No se puede monitorizar sesión"); }
+                }, (error) => {});
+            } catch (e) {}
         }
 
         function showMessage(text, type) {
             const box = document.getElementById('msg-box');
             box.textContent = text;
-            box.className = `p-3 rounded-xl text-xs text-center font-bold border ${type === 'error' ? 'bg-red-900/40 text-red-200 border-red-500/50' : 'bg-green-900/40 text-green-200 border-green-500/50'}`;
+            box.className = `p-3 rounded-xl text-xs text-center font-bold border ${type === 'error' ? 'bg-red-900/40 text-red-400 border-red-500' : 'bg-green-900/40 text-[#39ff14] border-[#39ff14]'}`;
             box.classList.remove('hidden');
         }
 
         function showApp() {
-            // Transición suave
-            const authContainer = document.getElementById('auth-container');
-            authContainer.style.opacity = '0';
-            setTimeout(() => {
-                authContainer.style.display = 'none';
-                const dashboard = document.getElementById('app-dashboard');
-                dashboard.style.display = 'block';
-                document.getElementById('logout-btn').classList.remove('hidden');
-                
-                // Iniciar gráfico simulado
-                initChart();
-                startTimer();
-            }, 500);
+            document.getElementById('auth-container').style.display = 'none';
+            document.getElementById('app-frame').src = APP_FILENAME;
+            document.getElementById('app-frame').style.display = 'block';
+            document.getElementById('logout-btn').classList.remove('hidden');
         }
 
         function forceLogout() {
             document.getElementById('session-alert').style.display = 'flex';
-            clearSession();
+            localStorage.removeItem('user_' + APP_ID); 
+            localStorage.removeItem('session_' + APP_ID);
+            localStorage.removeItem('doc_id_' + APP_ID);
+            document.getElementById('app-frame').src = 'about:blank';
         }
 
         window.logout = function() { 
             if (unsubscribeSession) unsubscribeSession();
-            clearSession();
-            location.reload(); 
-        }
-
-        function clearSession() {
             localStorage.removeItem('user_' + APP_ID); 
             localStorage.removeItem('session_' + APP_ID);
             localStorage.removeItem('doc_id_' + APP_ID);
+            location.reload(); 
         }
 
-        // --- DASHBOARD LOGIC (SIMULACIÓN) ---
-        function startTimer() {
-            setInterval(() => {
-                const now = new Date();
-                document.getElementById('connection-time').innerText = now.toLocaleTimeString();
-            }, 1000);
-        }
-
-        function initChart() {
-            const ctx = document.getElementById('telemetryChart').getContext('2d');
-            
-            // Datos simulados
-            const labels = Array.from({length: 20}, (_, i) => i);
-            const dataPoints = Array.from({length: 20}, () => Math.random() * 10 + 20);
-
-            new Chart(ctx, {
-                type: 'line',
-                data: {
-                    labels: labels,
-                    datasets: [{
-                        label: 'Velocidad (m/s)',
-                        data: dataPoints,
-                        borderColor: '#39ff14',
-                        backgroundColor: 'rgba(57, 255, 20, 0.1)',
-                        borderWidth: 2,
-                        tension: 0.4,
-                        pointRadius: 0
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: { display: false }
-                    },
-                    scales: {
-                        x: { display: false },
-                        y: { 
-                            grid: { color: 'rgba(255,255,255,0.1)' },
-                            ticks: { color: '#666', font: {size: 10} } 
-                        }
-                    },
-                    animation: {
-                        duration: 2000,
-                        easing: 'easeOutQuart'
-                    }
-                }
-            });
-        }
-
-        // Auto-login check
         const savedUser = localStorage.getItem('user_' + APP_ID);
         const savedDocId = localStorage.getItem('doc_id_' + APP_ID);
 
         if(savedUser && savedDocId) {
             showApp();
             monitorSession(savedDocId);
-        }
+        } else if (savedUser) window.logout(); 
     </script>
 </body>
 </html>
