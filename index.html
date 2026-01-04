@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TrackTelemetry - Acceso Oficial</title>
+    <title>TRACKSTELEMETRY - Acceso Oficial</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
@@ -169,7 +169,7 @@
     <div id="auth-container" class="min-h-screen flex flex-col items-center justify-center p-4 md:p-6">
         
         <div class="text-center mb-8 md:mb-10 mt-4 w-full">
-            <!-- Título Actualizado -->
+            <!-- Título Principal (Único sitio con &) -->
             <h1 class="text-3xl md:text-5xl font-black tracking-tighter neon-text-gradient uppercase">TRACKS & TELEMETRY</h1>
             
             <!-- Separador "Currado" -->
@@ -181,7 +181,7 @@
         <div class="img-container">
             <div class="aspect-9-16 shadow-[0_0_30px_rgba(57,255,20,0.15)]">
                 <img id="user-image" src="tracks.jpg" 
-                     alt="[Imagen de TrackTelemetry]" 
+                     alt="[Imagen de TRACKSTELEMETRY]" 
                      class="w-full h-full object-cover"
                      onerror="this.style.display='none'; document.getElementById('placeholder').style.display='flex';">
                 
@@ -250,7 +250,7 @@
         </div>
         
         <p class="mt-12 text-[9px] text-[#39ff14]/50 text-center max-w-lg uppercase tracking-[0.2em] font-medium">
-            Tracks & Telemetry v1.0 <span class="mx-2">|</span> slotcarhome@gmail.com
+            TRACKSTELEMETRY v1.0 <span class="mx-2">|</span> slotcarhome@gmail.com
         </p>
     </div>
 
@@ -298,9 +298,9 @@
         
         function updateMailLink() {
             const userEmail = emailInput.value || "[tu correo]";
-            // Asunto del correo actualizado
-            const subject = "Interés Licencia Tracks & Telemetry";
-            const body = `Hola, equipo de SLOTCARHOME,%0D%0A%0D%0AEstoy interesado en adquirir la licencia de Tracks & Telemetry por el Precio de 15 Euros%0D%0A%0D%0AQuedo a la espera de sus instrucciones para proceder con el pago.%0D%0A%0D%0AGracias y un saludo.`;
+            // NOMBRE TODO JUNTO EN EL EMAIL
+            const subject = "Interés Licencia TRACKSTELEMETRY";
+            const body = `Hola, equipo de SLOTCARHOME,%0D%0A%0D%0AEstoy interesado en adquirir la licencia de TRACKSTELEMETRY por el Precio de 15 Euros%0D%0A%0D%0AQuedo a la espera de sus instrucciones para proceder con el pago.%0D%0A%0D%0AGracias y un saludo.`;
             mailLink.href = `mailto:${ADMIN_EMAIL}?subject=${subject}&body=${body}`;
         }
         emailInput.addEventListener('input', updateMailLink);
