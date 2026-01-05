@@ -137,7 +137,7 @@
         import React, { useState, useMemo, useRef, useEffect, useCallback, Suspense } from 'react';
         import { createRoot } from 'react-dom/client';
         import { Canvas, useThree, useFrame, useLoader } from '@react-three/fiber';
-        import { OrbitControls, PerspectiveCamera, Environment, Center, Line, Text, Grid, Stage } from '@react-three/drei';
+        import { OrbitControls, PerspectiveCamera, Environment, Center, Line, Text, Grid, Stage, Image as DreiImage } from '@react-three/drei';
         import * as THREE from 'three';
         import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader';
         import { MTLLoader } from 'three/examples/jsm/loaders/MTLLoader';
@@ -151,7 +151,7 @@
             Bot, User, Activity, StopCircle, RefreshCw, Clock, Save, FolderOpen,
             Move3d, MousePointer2, PlayCircle, StopCircle as StopIcon, Truck, History, Upload, FileBox,
             Database, TreePine, Trees, BoxSelect, Eye, Image as ImageIcon,
-            Layers, Edit
+            Layers, Edit, Maximize2
         } from 'lucide-react';
 
         // --- SISTEMAS DE PISTA ---
@@ -498,6 +498,18 @@
             const [viewMode, setViewMode] = useState('editor'); 
             const [snapshotUrl, setSnapshotUrl] = useState(null);
 
+            const toggleFullScreen = () => {
+                if (!document.fullscreenElement) {
+                    document.documentElement.requestFullscreen().catch((e) => {
+                        console.log("Error al entrar en pantalla completa:", e);
+                    });
+                } else {
+                    if (document.exitFullscreen) {
+                        document.exitFullscreen();
+                    }
+                }
+            };
+
             useEffect(() => {
                 const loadPersistentData = async () => {
                     try {
@@ -672,7 +684,12 @@
                             {appMode === 'builder' && viewMode === 'editor' && !decoMode && (
                                 <>
                                     <div className="sidebar-section">
-                                        <div className="sidebar-section-title">Espacio de Trabajo</div>
+                                        <div className="flex justify-between items-center mb-1">
+                                            <div className="sidebar-section-title mb-0">Espacio de Trabajo</div>
+                                            <button onClick={toggleFullScreen} className="text-slate-500 hover:text-[#39ff14] transition p-1" title="Pantalla Completa">
+                                                <Maximize2 size={14} />
+                                            </button>
+                                        </div>
                                         <div className="mb-3 bg-slate-900/30 p-2 rounded border border-slate-800">
                                             <span className="text-[9px] font-bold text-slate-500 uppercase block mb-1 tracking-wider">TABLERO DE MADERA</span>
                                             <div className="btn-grid-2">
