@@ -151,7 +151,7 @@
             Bot, User, Activity, StopCircle, RefreshCw, Clock, Save, FolderOpen,
             Move3d, MousePointer2, PlayCircle, StopCircle as StopIcon, Truck, History, Upload, FileBox,
             Database, TreePine, Trees, BoxSelect, Eye, Image as ImageIcon,
-            Layers, Edit, Maximize2
+            Layers, Edit, Maximize
         } from 'lucide-react';
 
         // --- SISTEMAS DE PISTA ---
@@ -221,8 +221,77 @@
         const CustomCar = ({ objUrl, mtlUrl, texUrl, color, rotationZ = 0, rotationX = 0, offsetY = 0, offsetZ = 0, offsetX = 0 }) => { const [model, setModel] = useState(null); useEffect(() => { if (!objUrl) { setModel(null); return; } const loadModel = async () => { try { let materials = null; if (mtlUrl) { const mtlLoader = new MTLLoader(); materials = await mtlLoader.loadAsync(mtlUrl); materials.preload(); } const objLoader = new OBJLoader(); if (materials) { objLoader.setMaterials(materials); } const obj = await objLoader.loadAsync(objUrl); if (texUrl) { const textureLoader = new THREE.TextureLoader(); const texture = await textureLoader.loadAsync(texUrl); obj.traverse((child) => { if (child.isMesh) { child.material.map = texture; child.material.needsUpdate = true; } }); } const box = new THREE.Box3().setFromObject(obj); const size = new THREE.Vector3(); box.getSize(size); const TARGET_LENGTH = 13.5; const maxDim = Math.max(size.x, size.y, size.z); const scale = TARGET_LENGTH / maxDim; obj.scale.setScalar(scale); box.setFromObject(obj); const center = new THREE.Vector3(); box.getCenter(center); obj.position.x = -center.x; obj.position.z = -center.z; obj.position.y = -box.min.y; if (!mtlUrl && !texUrl) { obj.traverse((child) => { if (child.isMesh) { child.material.color.set(color); } }); } obj.rotation.y = -Math.PI / 2; setModel(obj); } catch (e) { console.error("Error loading custom model", e); setModel(null); } }; loadModel(); }, [objUrl, mtlUrl, texUrl, color]); if (!model) return <StandardCar color={color} rotationZ={rotationZ} offsetY={offsetY} offsetZ={offsetZ} />; return ( <group position={[offsetX, 0.5 + offsetY, offsetZ]} rotation={[rotationX * Math.PI / 180, 0, rotationZ * Math.PI / 180]}> <primitive object={model} castShadow receiveShadow /> </group> ); };
         const CarModel = ({ type, color = "#dc2626", customData, rotationZ, rotationX, offsetY, offsetZ, offsetX }) => { if (type === 'CUSTOM_OBJ' && customData?.obj) { return <CustomCar objUrl={customData.obj} mtlUrl={customData.mtl} texUrl={customData.tex} color={color} rotationZ={rotationZ} rotationX={rotationX} offsetY={offsetY} offsetZ={offsetZ} offsetX={offsetX} />; } return <StandardCar color={color} rotationZ={rotationZ} offsetY={offsetY} offsetZ={offsetZ} />; };
 
-        const DecorationObject = ({ objUrl, mtlUrl }) => { const [model, setModel] = useState(null); useEffect(() => { if (!objUrl) { setModel(null); return; } const loadModel = async () => { try { let materials = null; if (mtlUrl) { const mtlLoader = new MTLLoader(); materials = await mtlLoader.loadAsync(mtlUrl); materials.preload(); } const objLoader = new OBJLoader(); if (materials) { objLoader.setMaterials(materials); } const obj = await objLoader.loadAsync(objUrl); const box = new THREE.Box3().setFromObject(obj); const size = new THREE.Vector3(); box.getSize(size); const maxDim = Math.max(size.x, size.y, size.z); const TARGET_SIZE = 12.0; if (maxDim > 30 || maxDim < 2) { const scaleFactor = TARGET_SIZE / maxDim; obj.scale.setScalar(scaleFactor); } box.setFromObject(obj); const center = new THREE.Vector3(); box.getCenter(center); obj.position.x -= center.x; obj.position.z -= center.z; obj.position.y -= (box.min.y); setModel(obj); } catch (e) { console.error("Error loading decoration model", e); setModel(null); } }; loadModel(); }, [objUrl, mtlUrl]); if (!model) return <mesh position={[0, 2.5, 0]}><boxGeometry args={[5, 5, 5]} /><meshStandardMaterial color="gray" /></mesh>; return <primitive object={model} castShadow receiveShadow />; };
-        const DraggableDecoration = ({ data, modelInfo, isSelected, isDecoMode, onUpdate, onSelect }) => { const { camera, raycaster, gl } = useThree(); const [isDragging, setIsDragging] = useState(false); const dragPlane = useMemo(() => new THREE.Plane(new THREE.Vector3(0, 1, 0), 0), []); const intersectPoint = useMemo(() => new THREE.Vector3(), []); const handlePointerDown = (e) => { if (!isDecoMode) return; e.stopPropagation(); onSelect(data.instanceId); setIsDragging(true); gl.domElement.style.cursor = 'grabbing'; }; useEffect(() => { const handleMove = (e) => { if (!isDragging) return; const rect = gl.domElement.getBoundingClientRect(); const x = ((e.clientX - rect.left) / rect.width) * 2 - 1; const y = -((e.clientY - rect.top) / rect.height) * 2 + 1; raycaster.setFromCamera(new THREE.Vector2(x, y), camera); if (raycaster.ray.intersectPlane(dragPlane, intersectPoint)) { onUpdate(data.instanceId, 'position', [intersectPoint.x, 0, intersectPoint.z]); } }; const handleUp = () => { setIsDragging(false); gl.domElement.style.cursor = 'auto'; }; if (isDragging) { window.addEventListener('pointermove', handleMove); window.addEventListener('pointerup', handleUp); } return () => { window.removeEventListener('pointermove', handleMove); window.removeEventListener('pointerup', handleUp); }; }, [isDragging, camera, raycaster, gl, dragPlane, onUpdate, data.instanceId]); return ( <group position={data.position} rotation={new THREE.Euler(data.rotation[0], data.rotation[1], data.rotation[2])} scale={[data.scale, data.scale, data.scale]} onPointerDown={handlePointerDown} onPointerOver={(e) => { if(isDecoMode) { e.stopPropagation(); gl.domElement.style.cursor = 'move'; } }} onPointerOut={(e) => { if(isDecoMode) gl.domElement.style.cursor = 'auto'; }} > <DecorationObject objUrl={modelInfo?.customData?.obj} mtlUrl={modelInfo?.customData?.mtl} /> {isSelected && isDecoMode && ( <mesh position={[0, 6, 0]}> <boxGeometry args={[1, 14, 1]} /> <meshBasicMaterial color="yellow" wireframe /> </mesh> )} {isSelected && isDecoMode && ( <mesh position={[0, 0.1, 0]} rotation={[-Math.PI/2, 0, 0]}> <ringGeometry args={[5, 6, 32]} /> <meshBasicMaterial color="yellow" opacity={0.6} transparent /> </mesh> )} </group> ); };
+        // --- COMPONENTE DE DECORACIÓN MEJORADO (IMAGEN + OBJ) ---
+        const DecorationObject = ({ data }) => { 
+            const [model, setModel] = useState(null);
+            const [texture, setTexture] = useState(null);
+            const type = data?.type;
+            const customData = data?.customData;
+            const objUrl = customData?.obj;
+            const mtlUrl = customData?.mtl;
+            const texUrl = customData?.tex;
+
+            useEffect(() => {
+                if (type === 'IMAGE_2D' && texUrl) {
+                    // Cargar imagen como textura simple para un plano
+                    const loader = new THREE.TextureLoader();
+                    loader.load(texUrl, (tex) => {
+                        tex.colorSpace = THREE.SRGBColorSpace;
+                        setTexture(tex);
+                        setModel(null);
+                    }, undefined, (err) => console.error("Error loading texture", err));
+                    return;
+                }
+
+                if (!objUrl) { setModel(null); return; }
+                const loadModel = async () => { 
+                    try { 
+                        let materials = null; 
+                        if (mtlUrl) { const mtlLoader = new MTLLoader(); materials = await mtlLoader.loadAsync(mtlUrl); materials.preload(); } 
+                        const objLoader = new OBJLoader(); 
+                        if (materials) { objLoader.setMaterials(materials); } 
+                        const obj = await objLoader.loadAsync(objUrl); 
+                        
+                        // APLICAR TEXTURA SI EXISTE (JPG/PNG sobre OBJ)
+                        if (texUrl && type !== 'IMAGE_2D') {
+                            const texLoader = new THREE.TextureLoader();
+                            const tex = await texLoader.loadAsync(texUrl);
+                            tex.colorSpace = THREE.SRGBColorSpace;
+                            obj.traverse((child) => {
+                                if (child.isMesh) {
+                                    child.material.map = tex;
+                                    child.material.transparent = true; 
+                                    child.material.needsUpdate = true;
+                                }
+                            });
+                        }
+
+                        const box = new THREE.Box3().setFromObject(obj); 
+                        const size = new THREE.Vector3(); box.getSize(size); 
+                        const maxDim = Math.max(size.x, size.y, size.z); 
+                        const TARGET_SIZE = 12.0; 
+                        if (maxDim > 30 || maxDim < 2) { const scaleFactor = TARGET_SIZE / maxDim; obj.scale.setScalar(scaleFactor); } 
+                        box.setFromObject(obj); 
+                        const center = new THREE.Vector3(); box.getCenter(center); 
+                        obj.position.x -= center.x; obj.position.z -= center.z; obj.position.y -= (box.min.y); 
+                        setModel(obj); 
+                        setTexture(null);
+                    } catch (e) { console.error("Error loading decoration model", e); setModel(null); } 
+                }; 
+                loadModel(); 
+            }, [objUrl, mtlUrl, texUrl, type]); 
+
+            if (type === 'IMAGE_2D' && texture) {
+                return (
+                    <DreiImage url={texUrl} scale={[10, 10]} transparent position={[0, 5, 0]} />
+                );
+            }
+
+            if (!model) return <mesh position={[0, 2.5, 0]}><boxGeometry args={[5, 5, 5]} /><meshStandardMaterial color="gray" /></mesh>; 
+            return <primitive object={model} castShadow receiveShadow />; 
+        };
+
+        const DraggableDecoration = ({ data, modelInfo, isSelected, isDecoMode, onUpdate, onSelect }) => { const { camera, raycaster, gl } = useThree(); const [isDragging, setIsDragging] = useState(false); const dragPlane = useMemo(() => new THREE.Plane(new THREE.Vector3(0, 1, 0), 0), []); const intersectPoint = useMemo(() => new THREE.Vector3(), []); const handlePointerDown = (e) => { if (!isDecoMode) return; e.stopPropagation(); onSelect(data.instanceId); setIsDragging(true); gl.domElement.style.cursor = 'grabbing'; }; useEffect(() => { const handleMove = (e) => { if (!isDragging) return; const rect = gl.domElement.getBoundingClientRect(); const x = ((e.clientX - rect.left) / rect.width) * 2 - 1; const y = -((e.clientY - rect.top) / rect.height) * 2 + 1; raycaster.setFromCamera(new THREE.Vector2(x, y), camera); if (raycaster.ray.intersectPlane(dragPlane, intersectPoint)) { onUpdate(data.instanceId, 'position', [intersectPoint.x, 0, intersectPoint.z]); } }; const handleUp = () => { setIsDragging(false); gl.domElement.style.cursor = 'auto'; }; if (isDragging) { window.addEventListener('pointermove', handleMove); window.addEventListener('pointerup', handleUp); } return () => { window.removeEventListener('pointermove', handleMove); window.removeEventListener('pointerup', handleUp); }; }, [isDragging, camera, raycaster, gl, dragPlane, onUpdate, data.instanceId]); return ( <group position={data.position} rotation={new THREE.Euler(data.rotation[0], data.rotation[1], data.rotation[2])} scale={[data.scale, data.scale, data.scale]} onPointerDown={handlePointerDown} onPointerOver={(e) => { if(isDecoMode) { e.stopPropagation(); gl.domElement.style.cursor = 'move'; } }} onPointerOut={(e) => { if(isDecoMode) gl.domElement.style.cursor = 'auto'; }} > <DecorationObject data={modelInfo} /> {isSelected && isDecoMode && ( <mesh position={[0, 6, 0]}> <boxGeometry args={[1, 14, 1]} /> <meshBasicMaterial color="yellow" wireframe /> </mesh> )} {isSelected && isDecoMode && ( <mesh position={[0, 0.1, 0]} rotation={[-Math.PI/2, 0, 0]}> <ringGeometry args={[5, 6, 32]} /> <meshBasicMaterial color="yellow" opacity={0.6} transparent /> </mesh> )} </group> ); };
 
         const createTrackSpline = (chain, selectedLane, systemPieces, systemSpecs) => { const points = []; const segmentMap = []; const offset = systemSpecs.railOffset; let currentLaneOffset = selectedLane === 1 ? offset : -offset; const numCrosses = chain.filter(s => systemPieces[s.pId] && systemPieces[s.pId].isCross).length; const iterations = (numCrosses % 2 !== 0) ? 2 : 1; const SUBDIVISIONS_PER_UNIT = 2.0; const TRACK_H = 0.6; let isBroken = false; for (let loop = 0; loop < iterations; loop++) { if (isBroken) break; for (const seg of chain) { if (isBroken) break; const def = systemPieces[seg.pId]; if (!def) continue; let numSteps = 5; let segLength = 0; if (def.len) { numSteps = Math.max(10, Math.ceil(def.len * SUBDIVISIONS_PER_UNIT)); segLength = def.len; } else if (def.ang) { const arcLen = (def.ang * Math.PI / 180) * def.r; numSteps = Math.max(10, Math.ceil(arcLen * SUBDIVISIONS_PER_UNIT)); segLength = arcLen; } const isCurve = def.type === 'CURVE'; const radius = isCurve ? def.r : Infinity; const label = def.label; const dir = seg.dir; const startOffset = currentLaneOffset; const endOffset = def.isCross ? -currentLaneOffset : currentLaneOffset; for (let i = 0; i <= numSteps; i++) { const t = i / numSteps; const localPos = new THREE.Vector3(); if (def.type === 'STRAIGHT') { if (def.isCross) { const blend = (1 - Math.cos(t * Math.PI)) * 0.5; const currentZ = startOffset + (endOffset - startOffset) * blend; localPos.set(t * def.len, TRACK_H, currentZ); } else { localPos.set(t * def.len, TRACK_H, currentLaneOffset); } } else { const isLeft = seg.dir === 1; const Reff = isLeft ? (def.r + currentLaneOffset) : (def.r - currentLaneOffset); const angleRad = t * (def.ang * Math.PI / 180); if (isLeft) { const theta = -Math.PI/2 + angleRad; localPos.set(Reff * Math.cos(theta), TRACK_H, -(Reff * Math.sin(theta) + def.r)); } else { const theta = Math.PI/2 - angleRad; localPos.set(Reff * Math.cos(theta), TRACK_H, -(Reff * Math.sin(theta) - def.r)); } } localPos.applyMatrix4(seg.mat); if (points.length > 0 && i === 0) { const lastP = points[points.length - 1]; if (localPos.distanceTo(lastP) > 5.0) { isBroken = true; break; } } if (points.length === 0 || points[points.length-1].distanceTo(localPos) > 0.001) { points.push(localPos); } } if (!isBroken) { segmentMap.push({ length: segLength, isCurve, radius, label, dir }); if (def.isCross) { currentLaneOffset = endOffset; } } } } if (points.length < 2) return null; const closed = points.length > 2 && points[0].distanceTo(points[points.length-1]) < 20; const curve = new THREE.CatmullRomCurve3(points, closed, 'centripetal', 0.1); const splineLength = curve.getLength(); let accumulated = 0; const normalizedMap = segmentMap.map(s => { const startT = accumulated / splineLength; accumulated += s.length; const endT = accumulated / splineLength; return { ...s, startT, endT }; }); return { curve, totalLength: splineLength, closed, points, map: normalizedMap }; };
         const AnimatedCar = ({ tracks, throttle, isPlaying, isPaused, selectedLane = 1, onLap, motor, tires, voltage, weight, onDerail, driveMode, onTelemetry, totalLaps, systemId, resetToken, carModelId, carType, customData, modelRotation, modelRotationZ, modelRotationX, offsetY, offsetZ, offsetX }) => { 
@@ -428,7 +497,7 @@
                                             offsetX={data.specs?.offset?.x || 0}
                                         />
                                     ) : (
-                                        <DecorationObject objUrl={data.obj} mtlUrl={data.mtl} isSelected={false} />
+                                        <DecorationObject data={{type: data.type, customData: {obj: data.obj, mtl: data.mtl, tex: data.tex}}} />
                                     )}
                                 </Stage>
                              </Suspense>
@@ -456,6 +525,8 @@
             const imgInputRef = useRef(); 
             const decoObjRef = useRef();
             const decoMtlRef = useRef();
+            const decoTexRef = useRef(); 
+            const decoImgRef = useRef(); 
             const [decoMode, setDecoMode] = useState(false);
             const [customDecos, setCustomDecos] = useState([]);
             const [placedDecos, setPlacedDecos] = useState([]);
@@ -465,6 +536,7 @@
             const [confirmModal, setConfirmModal] = useState(null);
             const [previewData, setPreviewData] = useState(null);
             const [importState, setImportState] = useState({ name: '', obj: null, mtl: null, tex: null, objBlob: null, mtlBlob: null, texBlob: null });
+            const [importDecoState, setImportDecoState] = useState({ name: '', type: 'MODEL', obj: null, mtl: null, tex: null, objBlob: null, mtlBlob: null, texBlob: null });
             const [tempSpecs, setTempSpecs] = useState({ offset: {x:0, y:0, z:0}, rotation: {y:-90, z:0, x:0} });
 
             const initAudio = async () => { if (window.Tone) { await Tone.start(); Tone.Transport.start(); } };
@@ -478,7 +550,16 @@
             const [selectedLane, setSelectedLane] = useState(1); 
             const [selectedVoltage, setSelectedVoltage] = useState(12);
             const [carWeight, setCarWeight] = useState(85); 
-            const [selectedCarModelId, setSelectedCarModelId] = useState('gt3_red');
+            
+            // SELECCION ALEATORIA DE COCHE AL INICIO
+            const [selectedCarModelId, setSelectedCarModelId] = useState(() => {
+                if (PRESET_CARS && PRESET_CARS.length > 0) {
+                    const randomIndex = Math.floor(Math.random() * PRESET_CARS.length);
+                    return PRESET_CARS[randomIndex].id;
+                }
+                return 'gt3_red';
+            });
+
             const [customCars, setCustomCars] = useState([]);
             const [motors, setMotors] = useState(INITIAL_MOTORS);
             const [tires, setTires] = useState(INITIAL_TIRES);
@@ -498,18 +579,6 @@
             const [viewMode, setViewMode] = useState('editor'); 
             const [snapshotUrl, setSnapshotUrl] = useState(null);
 
-            const toggleFullScreen = () => {
-                if (!document.fullscreenElement) {
-                    document.documentElement.requestFullscreen().catch((e) => {
-                        console.log("Error al entrar en pantalla completa:", e);
-                    });
-                } else {
-                    if (document.exitFullscreen) {
-                        document.exitFullscreen();
-                    }
-                }
-            };
-
             useEffect(() => {
                 const loadPersistentData = async () => {
                     try {
@@ -520,7 +589,7 @@
                         }
                         const savedDecos = await get('ninco-custom-decos');
                         if (savedDecos && Array.isArray(savedDecos)) {
-                            const hydratedDecos = savedDecos.map(d => ({ ...d, customData: { obj: d.storage?.objBlob ? URL.createObjectURL(d.storage.objBlob) : null, mtl: d.storage?.mtlBlob ? URL.createObjectURL(d.storage.mtlBlob) : null } }));
+                            const hydratedDecos = savedDecos.map(d => ({ ...d, customData: { obj: d.storage?.objBlob ? URL.createObjectURL(d.storage.objBlob) : null, mtl: d.storage?.mtlBlob ? URL.createObjectURL(d.storage.mtlBlob) : null, tex: d.storage?.texBlob ? URL.createObjectURL(d.storage.texBlob) : null } }));
                             setCustomDecos(hydratedDecos);
                         }
                         const savedMotors = await get('ninco-motors'); if (savedMotors) setMotors(savedMotors);
@@ -589,17 +658,13 @@
                 if (piecesDef[selectedData.pId]?.type !== 'STRAIGHT') { speak("Solo en rectas"); return; } 
                 const tracksNeeded = (totalLanes / 2) - 1; 
                 if (tracksNeeded <= 0) return; 
-                
                 let newSegments = []; 
                 const currentDir = selectedData.dir !== undefined ? selectedData.dir : 1; 
-                
-                // Identify the 'current' track that we are extending from to remove its fences
                 const selectedTrackIndex = tracks.findIndex(t => t.some(s => s.id === selId));
                 let segmentsToDisableFences = [];
                 if (selectedTrackIndex !== -1) {
                     segmentsToDisableFences = tracks[selectedTrackIndex].map(s => s.id);
                 }
-
                 for (let i = 1; i <= tracksNeeded; i++) { 
                     const offset = systemSpecs.width * i; 
                     const m = selectedData.mat.clone(); 
@@ -609,12 +674,9 @@
                     const scale = new THREE.Vector3(); 
                     m.decompose(pos, rotQ, scale); 
                     const rot = new THREE.Euler().setFromQuaternion(rotQ); 
-                    // New tracks keep fences (outermost), older ones lose them
                     newSegments.push({ id: Date.now() + i + Math.random(), pId: 'STD', dir: currentDir, type: 'START', pos: pos, rot: rot, showFence: true }); 
                 } 
-                
                 setSegments(prev => { 
-                    // Update previous segments to remove fences if they belong to the inner track
                     const updatedPrev = prev.map(s => segmentsToDisableFences.includes(s.id) ? { ...s, showFence: false } : s);
                     const updated = [...updatedPrev, ...newSegments]; 
                     if (newSegments.length > 0) { setTimeout(() => setSelId(newSegments[newSegments.length-1].id), 50); } 
@@ -625,11 +687,62 @@
             const toggleSystem = () => { setConfirmModal({ message: "Cambiar de sistema reiniciará la pista actual. ¿Continuar?", onConfirm: () => { setCurrentSystem(s => s === 'ninco' ? 'scaleauto' : 'ninco'); setSegments([{ id: 1, pId: 'STD', dir: 1, type: 'START', pos: new THREE.Vector3(), rot: new THREE.Euler() }]); setConfirmModal(null); } }); };
             const updateStartPos = useCallback((id, newPos) => { setSegments(prev => { const newSegs = [...prev]; const index = newSegs.findIndex(s => s.id === id); if (index !== -1) { newSegs[index] = { ...newSegs[index], pos: newPos }; } return newSegs; }); }, []);
             const rotateStart = (deg) => { setSegments(prev => { const index = prev.findIndex(s => s.id === selId); if (index === -1) return prev; const newSegs = [...prev]; const currentRot = newSegs[index].rot; newSegs[index] = { ...newSegs[index], rot: new THREE.Euler(currentRot.x, currentRot.y + (deg * Math.PI / 180), currentRot.z) }; return newSegs; }); };
-            const handleDecoObjUpload = (e) => { const file = e.target.files[0]; if (!file) return; const url = URL.createObjectURL(file); const name = file.name.split('.')[0].substring(0, 10); const newDeco = { id: `deco-${Date.now()}`, name: name, type: 'CUSTOM_DECO', customData: { obj: url, mtl: null }, storage: { objBlob: file, mtlBlob: null } }; setCustomDecos(prev => { const updated = [...prev, newDeco]; set('ninco-custom-decos', updated).catch(err => console.error("Err saving deco", err)); return updated; }); setActiveDecoId(newDeco.id); speak("Decoración importada"); e.target.value = ''; };
-            const handleDecoMtlUpload = (e) => { const file = e.target.files[0]; if (!file) return; const url = URL.createObjectURL(file); if (activeDecoId) { setCustomDecos(prev => { const updated = prev.map(d => { if (d.id === activeDecoId) { return { ...d, customData: { ...d.customData, mtl: url }, storage: { ...d.storage, mtlBlob: file } }; } return d; }); set('ninco-custom-decos', updated); return updated; }); speak("Textura aplicada"); } e.target.value = ''; };
+            
+            // --- HANDLERS DECORACIÓN ---
+            const handleImportDecoFile = (type, e) => {
+                const file = e.target.files[0]; 
+                if (!file) return; 
+                const url = URL.createObjectURL(file); 
+                setImportDecoState(prev => ({ ...prev, [type]: url, [`${type}Blob`]: file })); 
+                speak("Archivo cargado");
+            };
+
+            const saveImportedDeco = () => {
+                if (!importDecoState.name) { speak("Falta el nombre"); return; }
+                if (importDecoState.type === 'MODEL' && !importDecoState.obj) { speak("Falta el archivo OBJ"); return; }
+                if (importDecoState.type === 'IMAGE' && !importDecoState.tex) { speak("Falta la imagen"); return; }
+
+                const isModel = importDecoState.type === 'MODEL';
+                const newDeco = {
+                    id: `custom-deco-${Date.now()}`,
+                    name: importDecoState.name,
+                    type: isModel ? 'CUSTOM_DECO' : 'IMAGE_2D',
+                    customData: {
+                        obj: isModel ? importDecoState.obj : null,
+                        mtl: isModel ? importDecoState.mtl : null,
+                        tex: importDecoState.tex // Used for both model texture or image 2d
+                    },
+                    storage: {
+                        objBlob: isModel ? importDecoState.objBlob : null,
+                        mtlBlob: isModel ? importDecoState.mtlBlob : null,
+                        texBlob: importDecoState.texBlob
+                    }
+                };
+
+                setCustomDecos(prev => {
+                    const updated = [...prev, newDeco];
+                    set('ninco-custom-decos', updated).catch(err => console.error(err));
+                    return updated;
+                });
+                
+                setActiveDecoId(newDeco.id);
+                setImportDecoState({ name: '', type: 'MODEL', obj: null, mtl: null, tex: null, objBlob: null, mtlBlob: null, texBlob: null });
+                speak("Decoración guardada");
+            };
+
             const placeDecoration = (point) => { if (!activeDecoId) return; const newInstance = { instanceId: Date.now(), modelId: activeDecoId, position: [point.x, 0, point.z], rotation: [0, 0, 0], scale: 1.0 }; setPlacedDecos(prev => [...prev, newInstance]); setSelectedDecoInstance(newInstance.instanceId); speak("Objeto colocado"); };
             const updateDecoInstance = (id, prop, value) => { setPlacedDecos(prev => prev.map(d => { if (d.instanceId === id) { return { ...d, [prop]: value }; } return d; })); };
             const deleteDecoInstance = (e) => { if (e && e.stopPropagation) { e.stopPropagation(); e.nativeEvent?.stopImmediatePropagation(); } if(selectedDecoInstance) { setPlacedDecos(prev => prev.filter(d => d.instanceId !== selectedDecoInstance)); setSelectedDecoInstance(null); speak("Objeto borrado"); } };
+
+            const toggleFullscreen = () => {
+                if (!document.fullscreenElement) {
+                    document.documentElement.requestFullscreen();
+                } else {
+                    if (document.exitFullscreen) {
+                        document.exitFullscreen();
+                    }
+                }
+            };
 
             const [editablePresetCars, setEditablePresetCars] = useState(PRESET_CARS);
             const allCars = useMemo(() => [...editablePresetCars, ...customCars], [editablePresetCars, customCars]);
@@ -686,9 +799,7 @@
                                     <div className="sidebar-section">
                                         <div className="flex justify-between items-center mb-1">
                                             <div className="sidebar-section-title mb-0">Espacio de Trabajo</div>
-                                            <button onClick={toggleFullScreen} className="text-slate-500 hover:text-[#39ff14] transition p-1" title="Pantalla Completa">
-                                                <Maximize2 size={14} />
-                                            </button>
+                                            <button onClick={toggleFullscreen} className="text-slate-500 hover:text-white transition-colors" title="Pantalla Completa"><Maximize size={14}/></button>
                                         </div>
                                         <div className="mb-3 bg-slate-900/30 p-2 rounded border border-slate-800">
                                             <span className="text-[9px] font-bold text-slate-500 uppercase block mb-1 tracking-wider">TABLERO DE MADERA</span>
@@ -817,19 +928,52 @@
                                         ) : (
                                             <div className="flex flex-col gap-2">
                                                 <div className="text-[9px] text-slate-500 text-center">Selecciona un objeto para colocar:</div>
-                                                <div className="grid grid-cols-3 gap-2">
+                                                <div className="grid grid-cols-3 gap-2 max-h-[150px] overflow-y-auto pr-1">
                                                     {[...BASE_DECOS, ...customDecos].map(deco => (
-                                                        <div key={deco.id} onClick={() => setActiveDecoId(deco.id)} className={`cursor-pointer flex flex-col items-center p-2 rounded border transition ${activeDecoId === deco.id ? 'bg-purple-900/50 border-purple-500 text-white' : 'bg-slate-800 border-slate-700 text-slate-400'}`}>
-                                                            <BoxSelect size={16} className="mb-1"/>
+                                                        <div key={deco.id} onClick={() => setActiveDecoId(deco.id)} className={`cursor-pointer flex flex-col items-center p-2 rounded border transition relative ${activeDecoId === deco.id ? 'bg-purple-900/50 border-purple-500 text-white' : 'bg-slate-800 border-slate-700 text-slate-400'}`}>
+                                                            {deco.type === 'IMAGE_2D' ? <ImageIcon size={16} className="mb-1 text-cyan-400"/> : <BoxSelect size={16} className="mb-1"/>}
                                                             <span className="text-[8px] font-bold uppercase truncate w-full text-center">{deco.name}</span>
+                                                            {deco.id.startsWith('custom-deco-') && (
+                                                                <button onClick={(e) => { e.stopPropagation(); const updated = customDecos.filter(d => d.id !== deco.id); setCustomDecos(updated); set('ninco-custom-decos', updated); if(activeDecoId === deco.id) setActiveDecoId(BASE_DECOS[0].id); }} className="absolute -top-1 -right-1 bg-red-900 text-white rounded-full p-0.5 w-4 h-4 flex items-center justify-center border border-red-500 hover:bg-red-600"><X size={10}/></button>
+                                                            )}
                                                         </div>
                                                     ))}
                                                 </div>
-                                                <div className="mt-4 border-t border-slate-700 pt-2">
-                                                    <input type="file" ref={decoObjRef} onChange={handleDecoObjUpload} accept=".obj" className="hidden" />
-                                                    <button onClick={()=>decoObjRef.current.click()} className="w-full flex items-center justify-center gap-1 px-2 py-2 bg-slate-800 hover:bg-purple-700 rounded text-[9px] font-bold text-white mb-1"><Plus size={10}/> IMPORTAR .OBJ</button>
-                                                    <input type="file" ref={decoMtlRef} onChange={handleDecoMtlUpload} accept=".mtl" className="hidden" />
-                                                    <button onClick={()=>decoMtlRef.current.click()} className="w-full flex items-center justify-center gap-1 px-2 py-2 bg-slate-800 hover:bg-purple-700 rounded text-[9px] font-bold text-white"><Upload size={10}/> TEXTURA .MTL</button>
+                                                
+                                                <div className="bg-slate-900/50 p-3 rounded border border-slate-800 mb-4 mt-2 shadow-[0_0_15px_rgba(168,85,247,0.05)]">
+                                                    <div className="flex items-center gap-2 border-b border-slate-700 pb-2 mb-2">
+                                                        <div className={`w-2 h-2 rounded-full ${importDecoState.obj || importDecoState.tex ? 'bg-green-400 animate-pulse' : 'bg-slate-600'}`}></div>
+                                                        <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">TALLER DE DECORACIÓN</span>
+                                                    </div>
+                                                    <input type="text" placeholder="Nombre del Objeto..." className="w-full bg-slate-800 border border-slate-600 rounded p-1.5 text-[10px] text-white mb-2 focus:border-purple-500 outline-none font-bold" value={importDecoState.name} onChange={(e) => setImportDecoState(prev => ({...prev, name: e.target.value}))} />
+                                                    
+                                                    <div className="flex gap-2 mb-2 bg-slate-800 p-1 rounded">
+                                                        <button onClick={() => setImportDecoState(prev => ({...prev, type: 'MODEL'}))} className={`flex-1 text-[9px] py-1 rounded font-bold transition ${importDecoState.type === 'MODEL' ? 'bg-purple-900 text-white shadow' : 'text-slate-500 hover:text-white'}`}>MODELO 3D</button>
+                                                        <button onClick={() => setImportDecoState(prev => ({...prev, type: 'IMAGE'}))} className={`flex-1 text-[9px] py-1 rounded font-bold transition ${importDecoState.type === 'IMAGE' ? 'bg-cyan-900 text-white shadow' : 'text-slate-500 hover:text-white'}`}>IMAGEN 2D</button>
+                                                    </div>
+
+                                                    {importDecoState.type === 'MODEL' ? (
+                                                        <div className="grid grid-cols-3 gap-1 mb-2">
+                                                            <input type="file" ref={decoObjRef} onChange={(e) => handleImportDecoFile('obj', e)} accept=".obj" className="hidden" />
+                                                            <button onClick={() => decoObjRef.current.click()} className={`btn-tile h-10 flex-col gap-0 ${importDecoState.obj ? 'border-green-500 text-green-400 bg-green-900/10' : 'bg-slate-800'}`} title="Cargar Modelo 3D"><Plus size={12}/><span className="btn-label mt-0">OBJ</span></button>
+                                                            
+                                                            <input type="file" ref={decoMtlRef} onChange={(e) => handleImportDecoFile('mtl', e)} accept=".mtl" className="hidden" />
+                                                            <button onClick={() => decoMtlRef.current.click()} className={`btn-tile h-10 flex-col gap-0 ${importDecoState.mtl ? 'border-green-500 text-green-400 bg-green-900/10' : 'bg-slate-800'}`} title="Cargar Materiales"><Upload size={12}/><span className="btn-label mt-0">MTL</span></button>
+                                                            
+                                                            <input type="file" ref={decoTexRef} onChange={(e) => handleImportDecoFile('tex', e)} accept="image/png, image/jpeg" className="hidden" />
+                                                            <button onClick={() => decoTexRef.current.click()} className={`btn-tile h-10 flex-col gap-0 ${importDecoState.tex ? 'border-green-500 text-green-400 bg-green-900/10' : 'bg-slate-800'}`} title="Cargar Piel 3D"><ImageIcon size={12}/><span className="btn-label mt-0">PIEL</span></button>
+                                                        </div>
+                                                    ) : (
+                                                        <div className="mb-2">
+                                                            <input type="file" ref={decoImgRef} onChange={(e) => handleImportDecoFile('tex', e)} accept="image/png, image/jpeg" className="hidden" />
+                                                            <button onClick={() => decoImgRef.current.click()} className={`w-full py-3 rounded border border-dashed flex flex-col items-center justify-center gap-1 transition ${importDecoState.tex ? 'border-green-500 bg-green-900/10 text-green-400' : 'border-slate-600 bg-slate-800 text-slate-500 hover:border-cyan-500 hover:text-cyan-400'}`}>
+                                                                <ImageIcon size={16}/>
+                                                                <span className="text-[9px] font-bold">{importDecoState.tex ? 'IMAGEN CARGADA' : 'SELECCIONAR PNG/JPG'}</span>
+                                                            </button>
+                                                        </div>
+                                                    )}
+                                                    
+                                                    <button onClick={saveImportedDeco} className="w-full bg-purple-900/20 border border-purple-600 text-purple-100 py-2 rounded text-[10px] font-bold hover:bg-purple-800 hover:shadow-[0_0_15px_#a855f7] flex items-center justify-center gap-2"><Save size={12}/> GRABAR OBJETO</button>
                                                 </div>
                                             </div>
                                         )}
