@@ -154,6 +154,16 @@
             Layers, Edit, Maximize
         } from 'lucide-react';
 
+        // --- GLOBAL VOICE FUNCTION ---
+        const speak = (text, interrupt = false) => { 
+            if (!window.speechSynthesis) return; 
+            if (interrupt) window.speechSynthesis.cancel(); 
+            const u = new SpeechSynthesisUtterance(text); 
+            u.lang = 'es-ES'; 
+            u.rate = 1.1; 
+            window.speechSynthesis.speak(u); 
+        };
+
         // --- SISTEMAS DE PISTA ---
         const TRACK_SYSTEMS = {
             ninco: { id: 'ninco', name: 'NINCO', width: 18, laneSpacing: 9, railOffset: 4.5, railGap: 0.25, color: '#1a1a1a', gripFactor: 1.0, headerClass: 'ninco-header', r1: 24.137, speedScale: 1.0 },
@@ -161,8 +171,88 @@
         };
 
         const MAGNET_FORCE = 25.0; 
+
+        // --- CONFIGURACIÓN COCHES DEL SERVIDOR (CARPETA LOCAL) ---
+        // Aquí defines qué ficheros tiene cada coche. 
+        // ¡IMPORTANTE! Asegúrate de subir estos ficheros a la misma carpeta que el index.html.
+        // Si no tienes alguno (ej. tex), déjalo como null.
+        const SERVER_CARS = [
+            {
+                id: 'server_car_sport',
+                name: "Sports Car",          // Nombre que ven los usuarios
+                files: {
+                    obj: "./SportsCar.obj",  // Archivo OBJ (Obligatorio)
+                    mtl: "./SportsCar.mtl",  // Archivo MTL (Si no hay, usa null)
+                    tex: null                // Archivo IMAGEN JPG/PNG (Si no hay, usa null. Ej: "./SportsCar.png")
+                },
+                // AJUSTA AQUÍ SI EL COCHE SALE MAL POSICIONADO
+                specs: { offset: {x:0, y:0, z:0}, rotation: {y:-90, z:0, x:0} },
+                color: '#ffffff'
+            },
+            
+            // Ejemplo para añadir un coche con los 3 ficheros (Descomentar y editar):
+            /*
+            {
+                id: 'mi_coche_rally',
+                name: "Rally WRC",
+                files: { 
+                    obj: "./RallyCar.obj", 
+                    mtl: "./RallyCar.mtl", 
+                    tex: "./RallyCar.png" 
+                },
+                specs: { offset: {x:0, y:0, z:0}, rotation: {y:-90, z:0, x:0} },
+                color: '#ffffff'
+            }
+            */
+        ];
+
+        // --- CONFIGURACIÓN DECORACIÓN DEL SERVIDOR (NUEVO) ---
+        // Añade aquí edificios, árboles, vallas, etc. que subas a la carpeta.
+        const SERVER_DECOS = [
+            // Ejemplo de OBJETO 3D (Descomentar y editar):
+            /*
+            {
+                id: 'server_deco_tribuna',
+                name: "Tribuna Principal",
+                type: 'MODEL', // Usa 'MODEL' para 3D
+                files: {
+                    obj: "./tribuna.obj",
+                    mtl: "./tribuna.mtl",
+                    tex: null 
+                }
+            },
+            */
+            // Ejemplo de IMAGEN 2D (Cartel, fondo, etc.):
+            /*
+            {
+                id: 'server_deco_cartel',
+                name: "Cartel Patrocinador",
+                type: 'IMAGE', // Usa 'IMAGE' para 2D
+                files: {
+                    obj: null,
+                    mtl: null,
+                    tex: "./logo_sponsor.png"
+                }
+            }
+            */
+        ];
+
         const PRESET_CARS = [
-            { id: 'gt3_red', name: 'GT3 Rosso', type: 'STD', color: '#dc2626', specs: { offset: {x:0, y:0, z:0}, rotation: {y:0, z:0, x:0} }, description: 'Competición' },
+            // Carga dinámica de los coches definidos en SERVER_CARS
+            ...SERVER_CARS.map(car => ({
+                id: car.id,
+                name: car.name,
+                type: 'CUSTOM_OBJ',
+                color: car.color,
+                specs: car.specs,
+                description: 'Coche del Servidor',
+                customData: {
+                    obj: car.files.obj,
+                    mtl: car.files.mtl,
+                    tex: car.files.tex
+                }
+            })),
+            { id: 'gt3_red', name: 'Ferrari 488 GT3', type: 'STD', color: '#dc2626', specs: { offset: {x:0, y:0, z:0}, rotation: {y:0, z:0, x:0} }, description: 'Competición' },
             { id: 'gt3_blue', name: 'GT3 Blu', type: 'STD', color: '#2563eb', specs: { offset: {x:0, y:0, z:0}, rotation: {y:0, z:0, x:0} }, description: 'Equipo Oficial' },
             { id: 'lmp_yellow', name: 'LMP1 Speed', type: 'STD', color: '#eab308', specs: { offset: {x:0, y:0, z:0}, rotation: {y:0, z:0, x:0} }, description: 'Resistencia' },
             { id: 'rally_green', name: 'Rally X', type: 'STD', color: '#16a34a', specs: { offset: {x:0, y:0, z:0}, rotation: {y:0, z:0, x:0} }, description: 'Off-road' },
@@ -174,7 +264,21 @@
             { id: 'premium_4', name: 'Cyber Truck', type: 'TRUCK', color: '#C0C0C0', specs: { offset: {x:0, y:0.5, z:0}, rotation: {y:0, z:0, x:0} }, description: 'Futurista' },
             { id: 'premium_5', name: 'Vintage 50s', type: 'STD', color: '#8B4513', specs: { offset: {x:0, y:0, z:0}, rotation: {y:0, z:0, x:0} }, description: 'Coleccionista' }
         ];
-        const BASE_DECOS = [{ id: 'cube', name: 'Caja Test', type: 'BASIC_CUBE' }];
+
+        const BASE_DECOS = [
+            // Carga dinámica de DECORACIÓN definida en SERVER_DECOS
+            ...SERVER_DECOS.map(deco => ({
+                id: deco.id,
+                name: deco.name,
+                type: deco.type === 'MODEL' ? 'CUSTOM_DECO' : 'IMAGE_2D',
+                customData: {
+                    obj: deco.files.obj,
+                    mtl: deco.files.mtl,
+                    tex: deco.files.tex
+                }
+            })),
+            { id: 'cube', name: 'Caja Test', type: 'BASIC_CUBE' }
+        ];
         const INITIAL_MOTORS = [{ id: 'nc8', name: 'NC-8 Thruster', rpm: 16000, torque: 0.8, color: '#fbbf24' }, { id: 'nc5', name: 'NC-5 Speeder', rpm: 20000, torque: 1.0, color: '#ef4444' }, { id: 'nc6', name: 'NC-6 Crusher', rpm: 23500, torque: 1.2, color: '#a855f7' }, { id: 'nc10', name: 'NC-10 Exceeder', rpm: 26000, torque: 1.4, color: '#3b82f6' }];
         const INITIAL_TIRES = [{ id: 'soft', name: 'Blandos', grip: 1.25, color: '#f87171', label: 'SOFT' }, { id: 'med',  name: 'Medios',  grip: 1.0,  color: '#facc15', label: 'MED' }, { id: 'hard', name: 'Duros',   grip: 0.85, color: '#94a3b8', label: 'HARD' }];
         const VOLTAGES = [12, 14];
@@ -217,9 +321,80 @@
         const createCurveShape = (r, deg, isLeft, width) => { const s = new THREE.Shape(); const inner = r - width/2; const outer = r + width/2; const start = isLeft ? -Math.PI/2 : Math.PI/2; const rad = (deg * Math.PI)/180; const end = isLeft ? start + rad : start - rad; s.absarc(0,0, outer, start, end, !isLeft); s.lineTo(Math.cos(end)*inner, Math.sin(end)*inner); s.absarc(0,0, inner, end, start, isLeft); return s; };
 
         const Wheel = ({ pos, radius = 1.1, width = 1.0, spokes = false, color = "#1a1a1a", rimColor = "#e2e8f0" }) => ( <group position={pos}> <mesh rotation={[Math.PI/2, 0, 0]} castShadow> <cylinderGeometry args={[radius, radius, width, 32]} /> <meshStandardMaterial color="#1a1a1a" roughness={0.9} /> </mesh> <mesh rotation={[Math.PI/2, 0, 0]} position={[0, 0, 0]}> <cylinderGeometry args={[radius * 0.65, radius * 0.65, width + 0.05, 16]} /> <meshStandardMaterial color={rimColor} metalness={0.8} roughness={0.2} /> </mesh> <mesh rotation={[Math.PI/2, 0, 0]} position={[0, 0, width/2 + 0.05]}> <cylinderGeometry args={[0.15, 0.15, 0.1, 6]} /> <meshStandardMaterial color={color} metalness={0.5} /> </mesh> </group> );
-        // MODIFICADO: Ajustada la posición Y (2.1) para que la parte inferior de la rueda (radio ~2.1) toque el punto 0 relativo al contenedor del coche
         const StandardCar = ({ color, rotationZ = 0, offsetY = 0, offsetZ = 0 }) => ( <group position={[0, 2.1 + offsetY, offsetZ]} rotation={[0, 0, rotationZ * Math.PI / 180]}> <mesh position={[0, 1.2, 0]} castShadow receiveShadow> <boxGeometry args={[13.5, 2.4, 6.0]} /> <meshStandardMaterial color={color} metalness={0.4} roughness={0.3} /> </mesh> <mesh position={[-1.5, 2.7, 0]} castShadow> <boxGeometry args={[6.0, 1.5, 4.8]} /> <meshStandardMaterial color="#111" metalness={0.8} /> </mesh> <Wheel pos={[4.5, 0, 3.1]} radius={2.1} width={1.2} /> <Wheel pos={[4.5, 0, -3.1]} radius={2.1} width={1.2} /> <Wheel pos={[-4.5, 0, 3.1]} radius={2.2} width={1.5} /> <Wheel pos={[-4.5, 0, -3.1]} radius={2.2} width={1.5} /> <mesh position={[-6.6, 3.0, 0]}><boxGeometry args={[1.5, 0.3, 6.0]} /><meshStandardMaterial color={color}/></mesh> </group> );
-        const CustomCar = ({ objUrl, mtlUrl, texUrl, color, rotationZ = 0, rotationX = 0, offsetY = 0, offsetZ = 0, offsetX = 0 }) => { const [model, setModel] = useState(null); useEffect(() => { if (!objUrl) { setModel(null); return; } const loadModel = async () => { try { let materials = null; if (mtlUrl) { const mtlLoader = new MTLLoader(); materials = await mtlLoader.loadAsync(mtlUrl); materials.preload(); } const objLoader = new OBJLoader(); if (materials) { objLoader.setMaterials(materials); } const obj = await objLoader.loadAsync(objUrl); if (texUrl) { const textureLoader = new THREE.TextureLoader(); const texture = await textureLoader.loadAsync(texUrl); obj.traverse((child) => { if (child.isMesh) { child.material.map = texture; child.material.needsUpdate = true; } }); } const box = new THREE.Box3().setFromObject(obj); const size = new THREE.Vector3(); box.getSize(size); const TARGET_LENGTH = 13.5; const maxDim = Math.max(size.x, size.y, size.z); const scale = TARGET_LENGTH / maxDim; obj.scale.setScalar(scale); box.setFromObject(obj); const center = new THREE.Vector3(); box.getCenter(center); obj.position.x = -center.x; obj.position.z = -center.z; obj.position.y = -box.min.y; if (!mtlUrl && !texUrl) { obj.traverse((child) => { if (child.isMesh) { child.material.color.set(color); } }); } obj.rotation.y = -Math.PI / 2; setModel(obj); } catch (e) { console.error("Error loading custom model", e); setModel(null); } }; loadModel(); }, [objUrl, mtlUrl, texUrl, color]); if (!model) return <StandardCar color={color} rotationZ={rotationZ} offsetY={offsetY} offsetZ={offsetZ} />; return ( <group position={[offsetX, 0.5 + offsetY, offsetZ]} rotation={[rotationX * Math.PI / 180, 0, rotationZ * Math.PI / 180]}> <primitive object={model} castShadow receiveShadow /> </group> ); };
+        const CustomCar = ({ objUrl, mtlUrl, texUrl, color, rotationZ = 0, rotationX = 0, offsetY = 0, offsetZ = 0, offsetX = 0 }) => { 
+            const [model, setModel] = useState(null); 
+            useEffect(() => { 
+                if (!objUrl) { setModel(null); return; } 
+                const loadModel = async () => { 
+                    try { 
+                        let materials = null; 
+                        if (mtlUrl) { 
+                            const mtlLoader = new MTLLoader(); 
+                            try {
+                                materials = await mtlLoader.loadAsync(mtlUrl); 
+                                materials.preload();
+                            } catch (mtlErr) { console.warn("MTL failed, using default mats", mtlErr); }
+                        } 
+                        
+                        const objLoader = new OBJLoader(); 
+                        if (materials) { objLoader.setMaterials(materials); } 
+                        const obj = await objLoader.loadAsync(objUrl); 
+                        
+                        // TEXTURE LOADING LOGIC (SAFE)
+                        if (texUrl) { 
+                            try {
+                                const textureLoader = new THREE.TextureLoader(); 
+                                const texture = await textureLoader.loadAsync(texUrl); 
+                                texture.colorSpace = THREE.SRGBColorSpace;
+                                
+                                // Aplicar textura a todas las mallas
+                                obj.traverse((child) => { 
+                                    if (child.isMesh) { 
+                                        const applyTex = (m) => {
+                                            m.map = texture;
+                                            m.color.setHex(0xffffff); // Resetear color a blanco para que la textura se vea bien
+                                            m.needsUpdate = true;
+                                        };
+                                        
+                                        if (Array.isArray(child.material)) {
+                                            child.material.forEach(applyTex);
+                                        } else {
+                                            applyTex(child.material);
+                                        }
+                                    } 
+                                }); 
+                            } catch (texErr) {
+                                console.warn("Error cargando textura (continuando sin ella):", texUrl);
+                            }
+                        } 
+                        
+                        const box = new THREE.Box3().setFromObject(obj); 
+                        const size = new THREE.Vector3(); box.getSize(size); 
+                        const TARGET_LENGTH = 13.5; 
+                        const maxDim = Math.max(size.x, size.y, size.z); 
+                        const scale = TARGET_LENGTH / maxDim; 
+                        obj.scale.setScalar(scale); 
+                        box.setFromObject(obj); 
+                        const center = new THREE.Vector3(); box.getCenter(center); 
+                        obj.position.x = -center.x; obj.position.z = -center.z; obj.position.y = -box.min.y; 
+                        
+                        if (!mtlUrl && !texUrl) { 
+                            obj.traverse((child) => { if (child.isMesh) { child.material.color.set(color); } }); 
+                        } 
+                        obj.rotation.y = -Math.PI / 2; 
+                        setModel(obj); 
+                    } catch (e) { 
+                        console.error("Error loading custom model", e); 
+                        setModel(null); 
+                    } 
+                }; 
+                loadModel(); 
+            }, [objUrl, mtlUrl, texUrl, color]); 
+            
+            if (!model) return <StandardCar color={color} rotationZ={rotationZ} offsetY={offsetY} offsetZ={offsetZ} />; 
+            return ( <group position={[offsetX, 0.5 + offsetY, offsetZ]} rotation={[rotationX * Math.PI / 180, 0, rotationZ * Math.PI / 180]}> <primitive object={model} castShadow receiveShadow /> </group> ); 
+        };
         const CarModel = ({ type, color = "#dc2626", customData, rotationZ, rotationX, offsetY, offsetZ, offsetX }) => { if (type === 'CUSTOM_OBJ' && customData?.obj) { return <CustomCar objUrl={customData.obj} mtlUrl={customData.mtl} texUrl={customData.tex} color={color} rotationZ={rotationZ} rotationX={rotationX} offsetY={offsetY} offsetZ={offsetZ} offsetX={offsetX} />; } return <StandardCar color={color} rotationZ={rotationZ} offsetY={offsetY} offsetZ={offsetZ} />; };
 
         // --- COMPONENTE DE DECORACIÓN MEJORADO (IMAGEN + OBJ) ---
@@ -234,7 +409,6 @@
 
             useEffect(() => {
                 if (type === 'IMAGE_2D' && texUrl) {
-                    // Cargar imagen como textura simple para un plano
                     const loader = new THREE.TextureLoader();
                     loader.load(texUrl, (tex) => {
                         tex.colorSpace = THREE.SRGBColorSpace;
@@ -248,23 +422,26 @@
                 const loadModel = async () => { 
                     try { 
                         let materials = null; 
-                        if (mtlUrl) { const mtlLoader = new MTLLoader(); materials = await mtlLoader.loadAsync(mtlUrl); materials.preload(); } 
+                        if (mtlUrl) { 
+                            const mtlLoader = new MTLLoader(); 
+                            try { materials = await mtlLoader.loadAsync(mtlUrl); materials.preload(); } catch(e){}
+                        } 
                         const objLoader = new OBJLoader(); 
                         if (materials) { objLoader.setMaterials(materials); } 
                         const obj = await objLoader.loadAsync(objUrl); 
                         
-                        // APLICAR TEXTURA SI EXISTE (JPG/PNG sobre OBJ)
                         if (texUrl && type !== 'IMAGE_2D') {
-                            const texLoader = new THREE.TextureLoader();
-                            const tex = await texLoader.loadAsync(texUrl);
-                            tex.colorSpace = THREE.SRGBColorSpace;
-                            obj.traverse((child) => {
-                                if (child.isMesh) {
-                                    child.material.map = tex;
-                                    child.material.transparent = true; 
-                                    child.material.needsUpdate = true;
-                                }
-                            });
+                            try {
+                                const texLoader = new THREE.TextureLoader();
+                                const tex = await texLoader.loadAsync(texUrl);
+                                tex.colorSpace = THREE.SRGBColorSpace;
+                                obj.traverse((child) => {
+                                    if (child.isMesh) {
+                                        if (Array.isArray(child.material)) { child.material.forEach(m => { m.map = tex; m.needsUpdate = true; }); }
+                                        else { child.material.map = tex; child.material.transparent = true; child.material.needsUpdate = true; }
+                                    }
+                                });
+                            } catch(e) { console.warn("Deco Texture failed"); }
                         }
 
                         const box = new THREE.Box3().setFromObject(obj); 
@@ -469,7 +646,7 @@
 
         const SceneManager = ({ appMode, viewMode, onCaptureReady, boardRef, boardSize, setViewMode }) => { const { camera, controls, gl, scene } = useThree(); useEffect(() => { if (viewMode === 'editor') { if (appMode === 'builder') { camera.position.set(0, 500, 0); camera.lookAt(0,0,0); camera.rotation.z = -Math.PI / 2; if(controls) { controls.target.set(0,0,0); controls.update(); } } else if (appMode === 'racer') { camera.position.set(0, 200, 300); if(controls) { controls.target.set(0,0,0); controls.update(); } } } }, [appMode, viewMode, camera, controls]); useEffect(() => { if (viewMode === 'capturing') { const oldBg = scene.background; scene.background = new THREE.Color('#ffffff'); const padding = 1.1; let targetX = 0; let targetZ = 0; let dimX = 200; let dimZ = 200; if (boardRef && boardRef.current) { targetX = boardRef.current.position.x; targetZ = boardRef.current.position.z; dimX = boardSize.width; dimZ = boardSize.length; } const vFOV = THREE.MathUtils.degToRad(camera.fov); const aspect = gl.domElement.clientWidth / gl.domElement.clientHeight; const finalHeight = Math.max((dimZ / 2) / Math.tan(vFOV / 2), (dimX / 2) / (Math.tan(vFOV / 2) * aspect)) * padding; camera.position.set(targetX, finalHeight, targetZ); camera.lookAt(targetX, 0, targetZ); camera.rotation.set(-Math.PI/2, 0, 0); camera.updateProjectionMatrix(); if (controls) controls.enabled = false; setTimeout(() => { gl.render(scene, camera); const dataUrl = gl.domElement.toDataURL('image/jpeg', 1.0); onCaptureReady(dataUrl); scene.background = oldBg; if (controls) controls.enabled = true; }, 300); } else if (viewMode === 'reset_view') { camera.position.set(0, 400, 200); camera.lookAt(0,0,0); if (controls) { controls.target.set(0, 0, 0); controls.update(); } setViewMode('editor'); } }, [viewMode, camera, controls, gl, scene, onCaptureReady, boardRef, boardSize, setViewMode]); return null; };
         const CameraEventsListener = ({ enabled }) => { const { camera, controls } = useThree(); useEffect(() => { if (!enabled) return; const handleCmd = (e) => { if (!controls) return; const { type, val, x, y } = e.detail; if (type === 'zoom') { camera.position.y = Math.max(50, camera.position.y + val); } else if (type === 'rotate') { const currentAzimuth = controls.getAzimuthalAngle(); controls.setAzimuthalAngle(currentAzimuth + (Math.PI/2 * val)); } else if (type === 'pan') { const speed = 50; const vecRight = new THREE.Vector3(1, 0, 0).applyQuaternion(camera.quaternion).setY(0).normalize(); const vecUp = new THREE.Vector3(0, 1, 0).applyQuaternion(camera.quaternion).setY(0).normalize(); camera.position.addScaledVector(vecRight, x * speed).addScaledVector(vecUp, y * speed); controls.target.addScaledVector(vecRight, x * speed).addScaledVector(vecUp, y * speed); } controls.update(); }; window.addEventListener('ninco-cmd', handleCmd); return () => window.removeEventListener('ninco-cmd', handleCmd); }, [enabled, camera, controls]); return null; };
-        const TouchControlsOverlay = ({ enabled }) => { if (!enabled) return null; const emit = (type, payload) => { window.dispatchEvent(new CustomEvent('ninco-cmd', { detail: { type, ...payload } })); }; return ( <div className="touch-controls"> <div className="flex gap-2 mb-2"> <button className="touch-btn" onClick={() => emit('zoom', { val: -50 })}><ZoomIn size={24} /></button> <button className="touch-btn" onClick={() => emit('zoom', { val: 50 })}><ZoomOut size={24} /></button> </div> <div className="flex gap-2 mb-2"> <button className="touch-btn" onClick={() => emit('rotate', { val: -1 })}><RotateCcw size={24} /></button> <button className="touch-btn" onClick={() => emit('rotate', { val: 1 })}><RotateCw size={24} /></button> </div> <div className="flex flex-col items-center gap-1 bg-black/80 p-2 rounded-xl border border-gray-800 shadow-xl backdrop-blur-sm"> <button className="touch-pad-btn" onClick={() => emit('pan', { x: 0, y: 1 })}><ArrowUp size={24}/></button> <div className="flex gap-1"><button className="touch-pad-btn" onClick={() => emit('pan', { x: -1, y: 0 })}><ArrowLeft size={24}/></button><div className="w-[45px] h-[45px] flex items-center justify-center text-slate-500"><Move size={20}/></div><button className="touch-pad-btn" onClick={() => emit('pan', { x: 1, y: 0 })}><ArrowRight size={24}/></button></div> <button className="touch-pad-btn" onClick={() => emit('pan', { x: 0, y: -1 })}><ArrowDown size={24}/></button> </div> </div> ); };
+        const TouchControlsOverlay = ({ enabled }) => { if (!enabled) return null; const emit = (type, payload) => { window.dispatchEvent(new CustomEvent('ninco-cmd', { detail: { type, ...payload } })); }; return ( <div className="touch-controls"> <div className="flex gap-2 mb-2"> <button className="touch-btn" onClick={() => { emit('zoom', { val: -50 }); speak("Zoom Acercar"); }}><ZoomIn size={24} /></button> <button className="touch-btn" onClick={() => { emit('zoom', { val: 50 }); speak("Zoom Alejar"); }}><ZoomOut size={24} /></button> </div> <div className="flex gap-2 mb-2"> <button className="touch-btn" onClick={() => { emit('rotate', { val: -1 }); speak("Rotar Izquierda"); }}><RotateCcw size={24} /></button> <button className="touch-btn" onClick={() => { emit('rotate', { val: 1 }); speak("Rotar Derecha"); }}><RotateCw size={24} /></button> </div> <div className="flex flex-col items-center gap-1 bg-black/80 p-2 rounded-xl border border-gray-800 shadow-xl backdrop-blur-sm"> <button className="touch-pad-btn" onClick={() => { emit('pan', { x: 0, y: 1 }); speak("Mover Arriba"); }}><ArrowUp size={24}/></button> <div className="flex gap-1"><button className="touch-pad-btn" onClick={() => { emit('pan', { x: -1, y: 0 }); speak("Mover Izquierda"); }}><ArrowLeft size={24}/></button><div className="w-[45px] h-[45px] flex items-center justify-center text-slate-500"><Move size={20}/></div><button className="touch-pad-btn" onClick={() => { emit('pan', { x: 1, y: 0 }); speak("Mover Derecha"); }}><ArrowRight size={24}/></button></div> <button className="touch-pad-btn" onClick={() => { emit('pan', { x: 0, y: -1 }); speak("Mover Abajo"); }}><ArrowDown size={24}/></button> </div> </div> ); };
 
         const PreviewModal = ({ data, onClose }) => {
             return (
@@ -477,7 +654,7 @@
                      <div className="bg-slate-900 border border-slate-700 rounded-xl shadow-2xl w-full max-w-lg h-[60vh] flex flex-col relative overflow-hidden">
                         <div className="absolute top-0 left-0 w-full p-3 flex justify-between items-center z-10 bg-gradient-to-b from-black/80 to-transparent pointer-events-none">
                             <h3 className="text-white font-bold uppercase tracking-wider drop-shadow-md px-2">{data.name}</h3>
-                            <button onClick={onClose} className="p-1 rounded-full bg-black/50 hover:bg-red-600 text-white transition pointer-events-auto"><X size={20}/></button>
+                            <button onClick={() => { onClose(); speak("Cerrar vista previa"); }} className="p-1 rounded-full bg-black/50 hover:bg-red-600 text-white transition pointer-events-auto"><X size={20}/></button>
                         </div>
                         <Canvas shadows dpr={[1, 2]} camera={{ position: [0, 0, 10], fov: 50 }}>
                              <color attach="background" args={['#0f172a']} />
@@ -544,7 +721,7 @@
             const playToneBeep = (note = "A4", duration = "0.1") => { if (!window.Tone) return; const synth = new Tone.Synth({ oscillator: { type: "square" }, envelope: { attack: 0.01, decay: 0.1, sustain: 0, release: 0.1 } }).toDestination(); synth.volume.value = -5; synth.triggerAttackRelease(note, duration); };
             const playToneStart = () => { if (!window.Tone) return; const poly = new Tone.PolySynth(Tone.Synth, { oscillator: { type: "sawtooth" }, envelope: { attack: 0.01, decay: 0.2, sustain: 0.5, release: 1 } }).toDestination(); poly.volume.value = -2; poly.triggerAttackRelease(["C4", "E4", "G4", "C5"], 0.6); };
             const playCrashSound = () => { if (!window.Tone) return; const noise = new Tone.NoiseSynth({ noise: { type: 'white' }, envelope: { attack: 0.005, decay: 0.3, sustain: 0 } }).toDestination(); noise.triggerAttackRelease("0.3"); };
-            const speak = (text, interrupt = false) => { if (!window.speechSynthesis) return; if (interrupt) window.speechSynthesis.cancel(); const u = new SpeechSynthesisUtterance(text); u.lang = 'es-ES'; u.rate = 1.1; window.speechSynthesis.speak(u); };
+            // speak() function is now global
 
             const [carEnabled, setCarEnabled] = useState(true); 
             const [carThrottle, setCarThrottle] = useState(0); 
@@ -555,14 +732,8 @@
             const [bodyWeight, setBodyWeight] = useState(25); 
             const [chassisWeight, setChassisWeight] = useState(60);
             
-            // SELECCION ALEATORIA DE COCHE AL INICIO
-            const [selectedCarModelId, setSelectedCarModelId] = useState(() => {
-                if (PRESET_CARS && PRESET_CARS.length > 0) {
-                    const randomIndex = Math.floor(Math.random() * PRESET_CARS.length);
-                    return PRESET_CARS[randomIndex].id;
-                }
-                return 'gt3_red';
-            });
+            // SELECCION COCHE POR DEFECTO (Local si existe, sino Ferrari rojo)
+            const [selectedCarModelId, setSelectedCarModelId] = useState(SERVER_CARS.length > 0 ? SERVER_CARS[0].id : 'gt3_red');
 
             const [customCars, setCustomCars] = useState([]);
             const [motors, setMotors] = useState(INITIAL_MOTORS);
@@ -642,20 +813,20 @@
                 const inventoryList = Object.entries(counts); return { totalLen: (totalLen / 100).toFixed(2), inventory: inventoryList, totalPieces: inventoryList.reduce((acc, [_, c]) => acc + c, 0) };
             }, [chain, piecesDef, systemSpecs]);
             
-            const generateReport = () => { setViewMode('capturing'); };
+            const generateReport = () => { setViewMode('capturing'); speak("Generando informe"); };
             const handleCaptureReady = (url) => { setSnapshotUrl(url); setViewMode('report'); };
-            const downloadPDF = () => { const element = document.getElementById('printable-area'); if (!element) return; const container = document.createElement('div'); container.style.position = 'absolute'; container.style.top = '-9999px'; container.style.left = '0'; container.style.width = '1123px'; container.style.zIndex = '-1'; const clone = element.cloneNode(true); clone.style.width = '100%'; clone.style.height = 'auto'; clone.style.color = '#000'; clone.style.background = '#fff'; container.appendChild(clone); document.body.appendChild(container); const opt = { margin: 10, filename: `ninco-track-${Date.now()}.pdf`, image: { type: 'jpeg', quality: 0.98 }, html2canvas: { scale: 2, useCORS: true, scrollY: 0, windowWidth: 1200 }, jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' } }; if (window.html2pdf) { window.html2pdf().set(opt).from(clone).save().then(() => { document.body.removeChild(container); }).catch(err => { console.error("PDF Error", err); document.body.removeChild(container); }); } else { document.body.removeChild(container); setConfirmModal({ message: "Librería PDF no cargada.", onConfirm: () => { window.print(); setConfirmModal(null); }, isAlert: true }); } };
-            const startBuilder = () => { setBoardSize({ width: parseFloat(inputSize.width), length: parseFloat(inputSize.length) }); setSegments([{ id: 1, pId: 'STD', dir: 1, type: 'START', pos: new THREE.Vector3(), rot: new THREE.Euler() }]); setSelId(1); setShowBoardConfig(false); if (window.Tone) { initAudio().catch(e => console.log("Audio init failed", e)); } };
-            const add = (pId) => { if(viewMode!=='editor') return; const newId = Date.now() + Math.random(); setSegments(prev => [...prev, { id: newId, pId, dir: nextDir, type: 'PIECE' }]); setSelId(newId); };
-            const del = () => { if(viewMode!=='editor') return; const f = segments.filter(s => s.id !== selId); setSegments(f); if(f.length > 0) setSelId(f[f.length-1].id); };
-            const undo = () => { if(viewMode!=='editor') return; if(segments.length > 1) { const newSegs = segments.slice(0, -1); setSegments(newSegs); setSelId(newSegs[newSegs.length-1].id); } };
-            const flip = () => { if(viewMode!=='editor') return; const s = segments.find(x => x.id === selId); if(s && piecesDef[s.pId].type === 'CURVE') { setSegments(segments.map(x => x.id === selId ? {...x, dir: x.dir * -1} : x)); } };
+            const downloadPDF = () => { const element = document.getElementById('printable-area'); if (!element) return; const container = document.createElement('div'); container.style.position = 'absolute'; container.style.top = '-9999px'; container.style.left = '0'; container.style.width = '1123px'; container.style.zIndex = '-1'; const clone = element.cloneNode(true); clone.style.width = '100%'; clone.style.height = 'auto'; clone.style.color = '#000'; clone.style.background = '#fff'; container.appendChild(clone); document.body.appendChild(container); const opt = { margin: 10, filename: `ninco-track-${Date.now()}.pdf`, image: { type: 'jpeg', quality: 0.98 }, html2canvas: { scale: 2, useCORS: true, scrollY: 0, windowWidth: 1200 }, jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' } }; if (window.html2pdf) { window.html2pdf().set(opt).from(clone).save().then(() => { document.body.removeChild(container); }).catch(err => { console.error("PDF Error", err); document.body.removeChild(container); }); } else { document.body.removeChild(container); setConfirmModal({ message: "Librería PDF no cargada.", onConfirm: () => { window.print(); setConfirmModal(null); }, isAlert: true }); } speak("Descargando PDF"); };
+            const startBuilder = () => { setBoardSize({ width: parseFloat(inputSize.width), length: parseFloat(inputSize.length) }); setSegments([{ id: 1, pId: 'STD', dir: 1, type: 'START', pos: new THREE.Vector3(), rot: new THREE.Euler() }]); setSelId(1); setShowBoardConfig(false); if (window.Tone) { initAudio().catch(e => console.log("Audio init failed", e)); } speak("Empezar diseño"); };
+            const add = (pId) => { if(viewMode!=='editor') return; const newId = Date.now() + Math.random(); setSegments(prev => [...prev, { id: newId, pId, dir: nextDir, type: 'PIECE' }]); setSelId(newId); const def = piecesDef[pId]; speak(def ? def.label : "Pieza añadida"); };
+            const del = () => { if(viewMode!=='editor') return; const f = segments.filter(s => s.id !== selId); setSegments(f); if(f.length > 0) setSelId(f[f.length-1].id); speak("Borrar pieza"); };
+            const undo = () => { if(viewMode!=='editor') return; if(segments.length > 1) { const newSegs = segments.slice(0, -1); setSegments(newSegs); setSelId(newSegs[newSegs.length-1].id); } speak("Deshacer"); };
+            const flip = () => { if(viewMode!=='editor') return; const s = segments.find(x => x.id === selId); if(s && piecesDef[s.pId].type === 'CURVE') { setSegments(segments.map(x => x.id === selId ? {...x, dir: x.dir * -1} : x)); } speak("Girar pieza"); };
             const toggleFence = () => { if(viewMode!=='editor') return; setSegments(prev => prev.map(s => s.id === selId ? { ...s, showFence: s.showFence === false ? true : false } : s)); speak("Vallas alternadas"); };
-            const reset = () => { setConfirmModal({ message: "¿Reiniciar todo?", onConfirm: () => { setSegments([{ id: 1, pId: 'STD', dir: 1, type: 'START', pos: new THREE.Vector3(), rot: new THREE.Euler() }]); setPlacedDecos([]); setSelId(1); setConfirmModal(null); } }); };
+            const reset = () => { setConfirmModal({ message: "¿Reiniciar todo?", onConfirm: () => { setSegments([{ id: 1, pId: 'STD', dir: 1, type: 'START', pos: new THREE.Vector3(), rot: new THREE.Euler() }]); setPlacedDecos([]); setSelId(1); setConfirmModal(null); } }); speak("Reiniciar circuito"); };
             const handlePieceClick = (e, id) => { if(viewMode!=='editor' || appMode !== 'builder' || moveMode === 'track' || decoMode) return; e.stopPropagation(); setSelId(id); };
             const rotateBoardOnly = () => { if (boardRef.current) { boardRef.current.rotation.z += Math.PI / 2; speak("Tablero girado"); } };
             const rotateTrackOnly = () => { setSegments(prev => prev.map(seg => { if (seg.type === 'START') { const vec = new THREE.Vector3(seg.pos.x, seg.pos.y, seg.pos.z); vec.applyAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI / 2); const originalRot = new THREE.Euler(seg.rot.x, seg.rot.y, seg.rot.z); const q = new THREE.Quaternion().setFromEuler(originalRot); const rotQ = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI / 2); q.premultiply(rotQ); const newRot = new THREE.Euler().setFromQuaternion(q); return { ...seg, pos: vec, rot: newRot }; } return seg; })); setPlacedDecos(prev => prev.map(deco => { const vec = new THREE.Vector3(deco.position[0], deco.position[1], deco.position[2]); vec.applyAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI / 2); const newRotY = deco.rotation[1] + Math.PI / 2; return { ...deco, position: [vec.x, vec.y, vec.z], rotation: [deco.rotation[0], newRotY, deco.rotation[2]] }; })); speak("Pista girada"); };
-            const spawnParallel = (direction) => { const selectedData = pieceMaps[selId]; if (!selectedData) return; const offset = direction === 'left' ? -systemSpecs.width : systemSpecs.width; const m = selectedData.mat.clone(); m.multiply(new THREE.Matrix4().makeTranslation(0, 0, offset)); const pos = new THREE.Vector3(); const rotQ = new THREE.Quaternion(); const scale = new THREE.Vector3(); m.decompose(pos, rotQ, scale); const rot = new THREE.Euler().setFromQuaternion(rotQ); const newId = Date.now(); setSegments(prev => [...prev, { id: newId, pId: 'STD', dir: 1, type: 'START', pos: pos, rot: rot }]); setSelId(newId); };
+            const spawnParallel = (direction) => { const selectedData = pieceMaps[selId]; if (!selectedData) return; const offset = direction === 'left' ? -systemSpecs.width : systemSpecs.width; const m = selectedData.mat.clone(); m.multiply(new THREE.Matrix4().makeTranslation(0, 0, offset)); const pos = new THREE.Vector3(); const rotQ = new THREE.Quaternion(); const scale = new THREE.Vector3(); m.decompose(pos, rotQ, scale); const rot = new THREE.Euler().setFromQuaternion(rotQ); const newId = Date.now(); setSegments(prev => [...prev, { id: newId, pId: 'STD', dir: 1, type: 'START', pos: pos, rot: rot }]); setSelId(newId); speak("Duplicar pista"); };
             const createLanes = (totalLanes) => { 
                 const selectedData = pieceMaps[selId]; 
                 if (!selectedData) { speak("Selecciona una recta"); return; } 
@@ -688,7 +859,7 @@
                 }); 
                 speak(`${totalLanes} carriles`); 
             };
-            const toggleSystem = () => { setConfirmModal({ message: "Cambiar de sistema reiniciará la pista actual. ¿Continuar?", onConfirm: () => { setCurrentSystem(s => s === 'ninco' ? 'scaleauto' : 'ninco'); setSegments([{ id: 1, pId: 'STD', dir: 1, type: 'START', pos: new THREE.Vector3(), rot: new THREE.Euler() }]); setConfirmModal(null); } }); };
+            const toggleSystem = () => { setConfirmModal({ message: "Cambiar de sistema reiniciará la pista actual. ¿Continuar?", onConfirm: () => { setCurrentSystem(s => s === 'ninco' ? 'scaleauto' : 'ninco'); setSegments([{ id: 1, pId: 'STD', dir: 1, type: 'START', pos: new THREE.Vector3(), rot: new THREE.Euler() }]); setConfirmModal(null); } }); speak("Cambiar sistema"); };
             const updateStartPos = useCallback((id, newPos) => { setSegments(prev => { const newSegs = [...prev]; const index = newSegs.findIndex(s => s.id === id); if (index !== -1) { newSegs[index] = { ...newSegs[index], pos: newPos }; } return newSegs; }); }, []);
             const rotateStart = (deg) => { setSegments(prev => { const index = prev.findIndex(s => s.id === selId); if (index === -1) return prev; const newSegs = [...prev]; const currentRot = newSegs[index].rot; newSegs[index] = { ...newSegs[index], rot: new THREE.Euler(currentRot.x, currentRot.y + (deg * Math.PI / 180), currentRot.z) }; return newSegs; }); };
             
@@ -746,6 +917,7 @@
                         document.exitFullscreen();
                     }
                 }
+                speak("Pantalla completa");
             };
 
             const [editablePresetCars, setEditablePresetCars] = useState(PRESET_CARS);
@@ -762,7 +934,7 @@
             const restartRace = () => { setRaceState('idle'); setCarThrottle(0); setResetToken(prev => prev + 1); setRaceData({ currentLap: 0, lastLapTime: 0, bestLap: 0, totalTime: 0, avgLap: 0 }); speak("Vuelta a Inicio"); };
             const handleDerail = () => { if (driveMode === 'ai') return; setIsCrashed(true); playCrashSound(); speak("Salida de pista", true); setCarThrottle(0); setTimeout(() => setIsCrashed(false), 2000); };
             const toggleDriveMode = () => { const newMode = driveMode === 'manual' ? 'ai' : 'manual'; setDriveMode(newMode); speak(newMode === 'ai' ? "Modo IA activado" : "Control Manual", true); setCarThrottle(0); };
-            const cycleLaps = () => { const idx = LAP_OPTIONS.indexOf(targetLaps); setTargetLaps(LAP_OPTIONS[(idx + 1) % LAP_OPTIONS.length]); };
+            const cycleLaps = () => { const idx = LAP_OPTIONS.indexOf(targetLaps); setTargetLaps(LAP_OPTIONS[(idx + 1) % LAP_OPTIONS.length]); speak(`Carrera a ${LAP_OPTIONS[(idx + 1) % LAP_OPTIONS.length]} vueltas`); };
             const addMotor = () => { const newMotor = { id: `custom-${Date.now()}`, name: 'Nuevo Motor', rpm: 22000, torque: 1.1, color: '#ffffff' }; const updated = [...motors, newMotor]; setMotors(updated); setSelectedMotor(newMotor); set('ninco-motors', updated); speak("Motor añadido"); };
             const addTire = () => { const newTire = { id: `custom-${Date.now()}`, name: 'Custom', grip: 1.1, color: '#ffffff', label: 'CUST' }; const updated = [...tires, newTire]; setTires(updated); setSelectedTire(newTire); set('ninco-tires', updated); speak("Neumático añadido"); };
             const deleteCustomItem = (type, id) => { if (type === 'car') { setCustomCars(prev => { const updated = prev.filter(c => c.id !== id); set('ninco-custom-cars', updated); return updated; }); if (selectedCarModelId === id) setSelectedCarModelId('gt3_red'); } else if (type === 'motor') { setMotors(prev => { const updated = prev.filter(m => m.id !== id); set('ninco-motors', updated); return updated; }); if (selectedMotor.id === id) setSelectedMotor(INITIAL_MOTORS[0]); } else if (type === 'tire') { setTires(prev => { const updated = prev.filter(t => t.id !== id); set('ninco-tires', updated); return updated; }); if (selectedTire.id === id) setSelectedTire(INITIAL_TIRES[0]); } speak("Elemento borrado"); };
@@ -792,8 +964,8 @@
                         <div className="sidebar-content">
                             <div className="sidebar-section">
                                 <div className="flex gap-2">
-                                    <div onClick={() => setAppMode('builder')} className={`tab-btn flex-1 ${appMode === 'builder' ? 'active' : ''}`}><PenTool size={14} /> DISEÑO</div>
-                                    <div onClick={() => setAppMode('racer')} className={`tab-btn flex-1 ${appMode === 'racer' ? 'active' : ''}`}><CarFront size={14} /> PILOTO</div>
+                                    <div onClick={() => { setAppMode('builder'); speak("Modo Diseño"); }} className={`tab-btn flex-1 ${appMode === 'builder' ? 'active' : ''}`}><PenTool size={14} /> DISEÑO</div>
+                                    <div onClick={() => { setAppMode('racer'); speak("Modo Piloto"); }} className={`tab-btn flex-1 ${appMode === 'racer' ? 'active' : ''}`}><CarFront size={14} /> PILOTO</div>
                                 </div>
                             </div>
 
@@ -808,14 +980,14 @@
                                         <div className="mb-3 bg-slate-900/30 p-2 rounded border border-slate-800">
                                             <span className="text-[9px] font-bold text-slate-500 uppercase block mb-1 tracking-wider">TABLERO DE MADERA</span>
                                             <div className="btn-grid-2">
-                                                <button onClick={() => setMoveMode(m => m === 'board' ? 'none' : 'board')} className={`btn-tile flex-row gap-2 h-10 ${moveMode === 'board' ? 'active-tool' : ''}`} title="Mover Tablero"><LayoutTemplate size={16} /><span className="btn-label mt-0">MOVER</span></button>
+                                                <button onClick={() => { setMoveMode(m => m === 'board' ? 'none' : 'board'); speak(moveMode === 'board' ? "Mover tablero desactivado" : "Mover tablero activado"); }} className={`btn-tile flex-row gap-2 h-10 ${moveMode === 'board' ? 'active-tool' : ''}`} title="Mover Tablero"><LayoutTemplate size={16} /><span className="btn-label mt-0">MOVER</span></button>
                                                 <button onClick={rotateBoardOnly} className="btn-tile flex-row gap-2 h-10" title="Girar solo el tablero"><RotateCw size={16} /><span className="btn-label mt-0">GIRAR</span></button>
                                             </div>
                                         </div>
                                         <div className="bg-slate-900/30 p-2 rounded border border-slate-800">
                                             <span className="text-[9px] font-bold text-slate-500 uppercase block mb-1 tracking-wider">CIRCUITO COMPLETO</span>
                                             <div className="btn-grid-2">
-                                                <button onClick={() => setMoveMode(m => m === 'track' ? 'none' : 'track')} className={`btn-tile flex-row gap-2 h-10 ${moveMode === 'track' ? 'active-tool' : ''}`} title="Mover Pista"><Move3d size={16} /><span className="btn-label mt-0">MOVER</span></button>
+                                                <button onClick={() => { setMoveMode(m => m === 'track' ? 'none' : 'track'); speak(moveMode === 'track' ? "Mover pista desactivado" : "Mover pista activado"); }} className={`btn-tile flex-row gap-2 h-10 ${moveMode === 'track' ? 'active-tool' : ''}`} title="Mover Pista"><Move3d size={16} /><span className="btn-label mt-0">MOVER</span></button>
                                                 <button onClick={rotateTrackOnly} className="btn-tile flex-row gap-2 h-10" title="Girar solo la pista"><RotateCw size={16} /><span className="btn-label mt-0">GIRAR</span></button>
                                             </div>
                                         </div>
@@ -861,17 +1033,17 @@
                                     <div className="sidebar-section">
                                         <div className="sidebar-section-title">Edición</div>
                                         <div className="btn-grid-2">
-                                            <button onClick={()=>setNextDir(d => d*-1)} className="btn-tile flex-row gap-2 h-10"><ArrowLeftRight size={18} className={nextDir===1?'text-indigo-400':'text-orange-400'}/><span className="btn-label mt-0">DIR</span></button>
+                                            <button onClick={()=> { setNextDir(d => d*-1); speak("Cambiar dirección"); }} className="btn-tile flex-row gap-2 h-10"><ArrowLeftRight size={18} className={nextDir===1?'text-indigo-400':'text-orange-400'}/><span className="btn-label mt-0">DIR</span></button>
                                             <button onClick={flip} className="btn-tile flex-row gap-2 h-10"><RotateCw size={18} /><span className="btn-label mt-0">GIRAR</span></button>
                                             <button onClick={undo} className="btn-tile flex-row gap-2 h-10 text-yellow-500"><Undo2 size={18} /><span className="btn-label mt-0">DESHACER</span></button>
                                             <button onClick={del} className="btn-tile btn-danger flex-row gap-2 h-10 border-red-900/50 text-red-400"><Trash2 size={18} /><span className="btn-label mt-0">BORRAR</span></button>
                                         </div>
                                         {isSelectionStart && moveMode === 'none' && (
                                             <div className="flex gap-1 mt-2 bg-blue-900/20 p-1 rounded border border-blue-500/30 justify-center">
-                                                <button onClick={()=>rotateStart(-5)} className="p-1 hover:text-white text-blue-300"><RotateCcw size={14}/></button>
+                                                <button onClick={()=> { rotateStart(-5); speak("Rotar Salida Izquierda"); }} className="p-1 hover:text-white text-blue-300"><RotateCcw size={14}/></button>
                                                 <span className="text-[9px] font-bold text-blue-300 self-center px-1">SALIDA</span>
-                                                <button onClick={()=>rotateStart(5)} className="p-1 hover:text-white text-blue-300"><RotateCw size={14}/></button>
-                                                <button onClick={()=>rotateStart(90)} className="ml-1 text-[9px] font-bold text-blue-300 border-l border-blue-700 pl-2">90º</button>
+                                                <button onClick={()=> { rotateStart(5); speak("Rotar Salida Derecha"); }} className="p-1 hover:text-white text-blue-300"><RotateCw size={14}/></button>
+                                                <button onClick={()=> { rotateStart(90); speak("Rotar 90 Grados"); }} className="ml-1 text-[9px] font-bold text-blue-300 border-l border-blue-700 pl-2">90º</button>
                                             </div>
                                         )}
                                         <button onClick={()=>spawnParallel('left')} className="btn-new-circuit mt-1 h-8 flex-row gap-2"><CopyPlus size={14} /><span>DUPLICAR PISTA</span></button>
@@ -881,14 +1053,14 @@
                                         <div className="sidebar-section-title">Archivo</div>
                                         <div className="btn-grid-3">
                                             <button onClick={saveCircuit} className="btn-tile h-12 bg-green-900/30 border-green-700 text-green-100"><Save size={18}/><span className="btn-label text-green-400">GUARDAR</span></button>
-                                            <button onClick={()=>fileInputRef.current.click()} className="btn-tile h-12 bg-slate-700 border-slate-600"><FolderOpen size={18}/><span className="btn-label">ABRIR</span></button>
+                                            <button onClick={()=> { fileInputRef.current.click(); speak("Abrir archivo"); }} className="btn-tile h-12 bg-slate-700 border-slate-600"><FolderOpen size={18}/><span className="btn-label">ABRIR</span></button>
                                             <button onClick={generateReport} className="btn-tile h-12 bg-red-900/30 border-red-700 text-red-100"><FileText size={18}/><span className="btn-label text-red-400">PDF</span></button>
                                         </div>
                                         <div className="btn-grid-2 mt-2">
-                                            <button onClick={()=>setViewMode('reset_view')} className="btn-tile h-10 flex-row gap-2 bg-indigo-900/20 border-indigo-700"><Home size={14}/><span className="btn-label mt-0 text-indigo-300">CENTRAR</span></button>
+                                            <button onClick={()=> { setViewMode('reset_view'); speak("Centrar vista"); }} className="btn-tile h-10 flex-row gap-2 bg-indigo-900/20 border-indigo-700"><Home size={14}/><span className="btn-label mt-0 text-indigo-300">CENTRAR</span></button>
                                             <button onClick={reset} className="btn-tile btn-danger h-10 flex-row gap-2 bg-red-950/30 border-red-900"><RotateCcw size={14}/><span className="btn-label mt-0 text-red-500">REINICIAR</span></button>
                                         </div>
-                                        <button onClick={()=>setShowBoardConfig(true)} className="w-full text-[9px] text-slate-500 uppercase mt-4 hover:text-white text-center">Configurar Dimensiones</button>
+                                        <button onClick={()=> { setShowBoardConfig(true); speak("Configurar dimensiones"); }} className="w-full text-[9px] text-slate-500 uppercase mt-4 hover:text-white text-center">Configurar Dimensiones</button>
                                         <input type="file" ref={fileInputRef} onChange={loadCircuit} accept=".json" style={{display:'none'}} />
                                     </div>
                                 </>
@@ -909,22 +1081,22 @@
                                                  <div className="flex justify-between items-center px-1">
                                                      <span className="text-[8px] font-bold text-slate-500">DIRECCIÓN (Y)</span>
                                                      <div className="flex gap-1">
-                                                         <button onClick={(e)=>{ e.stopPropagation(); updateDecoInstance(selectedDecoObject.instanceId, 'rotation', [selectedDecoObject.rotation[0], selectedDecoObject.rotation[1] - Math.PI/4, selectedDecoObject.rotation[2]]); }} className="p-1.5 bg-slate-700 rounded hover:bg-cyan-600 transition"><RotateCcw size={14}/></button>
-                                                         <button onClick={(e)=>{ e.stopPropagation(); updateDecoInstance(selectedDecoObject.instanceId, 'rotation', [selectedDecoObject.rotation[0], selectedDecoObject.rotation[1] + Math.PI/4, selectedDecoObject.rotation[2]]); }} className="p-1.5 bg-slate-700 rounded hover:bg-cyan-600 transition"><RotateCw size={14}/></button>
+                                                         <button onClick={(e)=>{ e.stopPropagation(); updateDecoInstance(selectedDecoObject.instanceId, 'rotation', [selectedDecoObject.rotation[0], selectedDecoObject.rotation[1] - Math.PI/4, selectedDecoObject.rotation[2]]); speak("Rotar Y"); }} className="p-1.5 bg-slate-700 rounded hover:bg-cyan-600 transition"><RotateCcw size={14}/></button>
+                                                         <button onClick={(e)=>{ e.stopPropagation(); updateDecoInstance(selectedDecoObject.instanceId, 'rotation', [selectedDecoObject.rotation[0], selectedDecoObject.rotation[1] + Math.PI/4, selectedDecoObject.rotation[2]]); speak("Rotar Y"); }} className="p-1.5 bg-slate-700 rounded hover:bg-cyan-600 transition"><RotateCw size={14}/></button>
                                                      </div>
                                                  </div>
                                                  <div className="flex justify-between items-center px-1 border-t border-slate-700 pt-1">
                                                      <span className="text-[8px] font-bold text-yellow-500">TUMBAR (X)</span>
                                                      <div className="flex gap-1">
-                                                         <button onClick={(e)=>{ e.stopPropagation(); updateDecoInstance(selectedDecoObject.instanceId, 'rotation', [selectedDecoObject.rotation[0] - Math.PI/4, selectedDecoObject.rotation[1], selectedDecoObject.rotation[2]]); }} className="p-1.5 bg-slate-700 rounded hover:bg-yellow-600 transition text-yellow-200"><RotateCcw size={14} className="rotate-90"/></button>
-                                                         <button onClick={(e)=>{ e.stopPropagation(); updateDecoInstance(selectedDecoObject.instanceId, 'rotation', [selectedDecoObject.rotation[0] + Math.PI/4, selectedDecoObject.rotation[1], selectedDecoObject.rotation[2]]); }} className="p-1.5 bg-slate-700 rounded hover:bg-yellow-600 transition text-yellow-200"><RotateCw size={14} className="rotate-90"/></button>
+                                                         <button onClick={(e)=>{ e.stopPropagation(); updateDecoInstance(selectedDecoObject.instanceId, 'rotation', [selectedDecoObject.rotation[0] - Math.PI/4, selectedDecoObject.rotation[1], selectedDecoObject.rotation[2]]); speak("Tumbar X"); }} className="p-1.5 bg-slate-700 rounded hover:bg-yellow-600 transition text-yellow-200"><RotateCcw size={14} className="rotate-90"/></button>
+                                                         <button onClick={(e)=>{ e.stopPropagation(); updateDecoInstance(selectedDecoObject.instanceId, 'rotation', [selectedDecoObject.rotation[0] + Math.PI/4, selectedDecoObject.rotation[1], selectedDecoObject.rotation[2]]); speak("Tumbar X"); }} className="p-1.5 bg-slate-700 rounded hover:bg-yellow-600 transition text-yellow-200"><RotateCw size={14} className="rotate-90"/></button>
                                                      </div>
                                                  </div>
                                                  <div className="flex justify-between items-center px-1 border-t border-slate-700 pt-1 mt-1">
                                                      <span className="text-[8px] font-bold text-blue-400">TAMAÑO</span>
                                                      <div className="flex gap-1">
-                                                         <button onClick={(e)=>{ e.stopPropagation(); updateDecoInstance(selectedDecoObject.instanceId, 'scale', Math.max(0.1, selectedDecoObject.scale - 0.1)); }} className="p-1.5 bg-slate-700 rounded hover:bg-blue-600 transition"><Minus size={14}/></button>
-                                                         <button onClick={(e)=>{ e.stopPropagation(); updateDecoInstance(selectedDecoObject.instanceId, 'scale', selectedDecoObject.scale + 0.1); }} className="p-1.5 bg-slate-700 rounded hover:bg-blue-600 transition"><Plus size={14}/></button>
+                                                         <button onClick={(e)=>{ e.stopPropagation(); updateDecoInstance(selectedDecoObject.instanceId, 'scale', Math.max(0.1, selectedDecoObject.scale - 0.1)); speak("Reducir"); }} className="p-1.5 bg-slate-700 rounded hover:bg-blue-600 transition"><Minus size={14}/></button>
+                                                         <button onClick={(e)=>{ e.stopPropagation(); updateDecoInstance(selectedDecoObject.instanceId, 'scale', selectedDecoObject.scale + 0.1); speak("Ampliar"); }} className="p-1.5 bg-slate-700 rounded hover:bg-blue-600 transition"><Plus size={14}/></button>
                                                      </div>
                                                  </div>
                                                  <button onClick={deleteDecoInstance} className="w-full bg-red-900/50 hover:bg-red-600 text-white p-2 rounded mt-2 flex items-center justify-center gap-2 font-bold text-xs"><Trash2 size={14}/> ELIMINAR</button>
@@ -934,7 +1106,7 @@
                                                 <div className="text-[9px] text-slate-500 text-center">Selecciona un objeto para colocar:</div>
                                                 <div className="grid grid-cols-3 gap-2 max-h-[150px] overflow-y-auto pr-1">
                                                     {[...BASE_DECOS, ...customDecos].map(deco => (
-                                                        <div key={deco.id} onClick={() => setActiveDecoId(deco.id)} className={`cursor-pointer flex flex-col items-center p-2 rounded border transition relative ${activeDecoId === deco.id ? 'bg-purple-900/50 border-purple-500 text-white' : 'bg-slate-800 border-slate-700 text-slate-400'}`}>
+                                                        <div key={deco.id} onClick={() => { setActiveDecoId(deco.id); speak(deco.name); }} className={`cursor-pointer flex flex-col items-center p-2 rounded border transition relative ${activeDecoId === deco.id ? 'bg-purple-900/50 border-purple-500 text-white' : 'bg-slate-800 border-slate-700 text-slate-400'}`}>
                                                             {deco.type === 'IMAGE_2D' ? <ImageIcon size={16} className="mb-1 text-cyan-400"/> : <BoxSelect size={16} className="mb-1"/>}
                                                             <span className="text-[8px] font-bold uppercase truncate w-full text-center">{deco.name}</span>
                                                             {deco.id.startsWith('custom-deco-') && (
@@ -952,25 +1124,25 @@
                                                     <input type="text" placeholder="Nombre del Objeto..." className="w-full bg-slate-800 border border-slate-600 rounded p-1.5 text-[10px] text-white mb-2 focus:border-purple-500 outline-none font-bold" value={importDecoState.name} onChange={(e) => setImportDecoState(prev => ({...prev, name: e.target.value}))} />
                                                     
                                                     <div className="flex gap-2 mb-2 bg-slate-800 p-1 rounded">
-                                                        <button onClick={() => setImportDecoState(prev => ({...prev, type: 'MODEL'}))} className={`flex-1 text-[9px] py-1 rounded font-bold transition ${importDecoState.type === 'MODEL' ? 'bg-purple-900 text-white shadow' : 'text-slate-500 hover:text-white'}`}>MODELO 3D</button>
-                                                        <button onClick={() => setImportDecoState(prev => ({...prev, type: 'IMAGE'}))} className={`flex-1 text-[9px] py-1 rounded font-bold transition ${importDecoState.type === 'IMAGE' ? 'bg-cyan-900 text-white shadow' : 'text-slate-500 hover:text-white'}`}>IMAGEN 2D</button>
+                                                        <button onClick={() => { setImportDecoState(prev => ({...prev, type: 'MODEL'})); speak("Modo Modelo 3D"); }} className={`flex-1 text-[9px] py-1 rounded font-bold transition ${importDecoState.type === 'MODEL' ? 'bg-purple-900 text-white shadow' : 'text-slate-500 hover:text-white'}`}>MODELO 3D</button>
+                                                        <button onClick={() => { setImportDecoState(prev => ({...prev, type: 'IMAGE'})); speak("Modo Imagen"); }} className={`flex-1 text-[9px] py-1 rounded font-bold transition ${importDecoState.type === 'IMAGE' ? 'bg-cyan-900 text-white shadow' : 'text-slate-500 hover:text-white'}`}>IMAGEN 2D</button>
                                                     </div>
 
                                                     {importDecoState.type === 'MODEL' ? (
                                                         <div className="grid grid-cols-3 gap-1 mb-2">
                                                             <input type="file" ref={decoObjRef} onChange={(e) => handleImportDecoFile('obj', e)} accept=".obj" className="hidden" />
-                                                            <button onClick={() => decoObjRef.current.click()} className={`btn-tile h-10 flex-col gap-0 ${importDecoState.obj ? 'border-green-500 text-green-400 bg-green-900/10' : 'bg-slate-800'}`} title="Cargar Modelo 3D"><Plus size={12}/><span className="btn-label mt-0">OBJ</span></button>
+                                                            <button onClick={() => { decoObjRef.current.click(); speak("Cargar O B J"); }} className={`btn-tile h-10 flex-col gap-0 ${importDecoState.obj ? 'border-green-500 text-green-400 bg-green-900/10' : 'bg-slate-800'}`} title="Cargar Modelo 3D"><Plus size={12}/><span className="btn-label mt-0">OBJ</span></button>
                                                             
                                                             <input type="file" ref={decoMtlRef} onChange={(e) => handleImportDecoFile('mtl', e)} accept=".mtl" className="hidden" />
-                                                            <button onClick={() => decoMtlRef.current.click()} className={`btn-tile h-10 flex-col gap-0 ${importDecoState.mtl ? 'border-green-500 text-green-400 bg-green-900/10' : 'bg-slate-800'}`} title="Cargar Materiales"><Upload size={12}/><span className="btn-label mt-0">MTL</span></button>
+                                                            <button onClick={() => { decoMtlRef.current.click(); speak("Cargar M T L"); }} className={`btn-tile h-10 flex-col gap-0 ${importDecoState.mtl ? 'border-green-500 text-green-400 bg-green-900/10' : 'bg-slate-800'}`} title="Cargar Materiales"><Upload size={12}/><span className="btn-label mt-0">MTL</span></button>
                                                             
                                                             <input type="file" ref={decoTexRef} onChange={(e) => handleImportDecoFile('tex', e)} accept="image/png, image/jpeg" className="hidden" />
-                                                            <button onClick={() => decoTexRef.current.click()} className={`btn-tile h-10 flex-col gap-0 ${importDecoState.tex ? 'border-green-500 text-green-400 bg-green-900/10' : 'bg-slate-800'}`} title="Cargar Piel 3D"><ImageIcon size={12}/><span className="btn-label mt-0">PIEL</span></button>
+                                                            <button onClick={() => { decoTexRef.current.click(); speak("Cargar Piel"); }} className={`btn-tile h-10 flex-col gap-0 ${importDecoState.tex ? 'border-green-500 text-green-400 bg-green-900/10' : 'bg-slate-800'}`} title="Cargar Piel 3D"><ImageIcon size={12}/><span className="btn-label mt-0">PIEL</span></button>
                                                         </div>
                                                     ) : (
                                                         <div className="mb-2">
                                                             <input type="file" ref={decoImgRef} onChange={(e) => handleImportDecoFile('tex', e)} accept="image/png, image/jpeg" className="hidden" />
-                                                            <button onClick={() => decoImgRef.current.click()} className={`w-full py-3 rounded border border-dashed flex flex-col items-center justify-center gap-1 transition ${importDecoState.tex ? 'border-green-500 bg-green-900/10 text-green-400' : 'border-slate-600 bg-slate-800 text-slate-500 hover:border-cyan-500 hover:text-cyan-400'}`}>
+                                                            <button onClick={() => { decoImgRef.current.click(); speak("Cargar Imagen"); }} className={`w-full py-3 rounded border border-dashed flex flex-col items-center justify-center gap-1 transition ${importDecoState.tex ? 'border-green-500 bg-green-900/10 text-green-400' : 'border-slate-600 bg-slate-800 text-slate-500 hover:border-cyan-500 hover:text-cyan-400'}`}>
                                                                 <ImageIcon size={16}/>
                                                                 <span className="text-[9px] font-bold">{importDecoState.tex ? 'IMAGEN CARGADA' : 'SELECCIONAR PNG/JPG'}</span>
                                                             </button>
@@ -1047,9 +1219,9 @@
                                                     <span className={`text-[9px] font-bold uppercase truncate ${selectedCarModelId === car.id ? 'text-purple-100' : 'text-slate-400 group-hover:text-white transition-colors'}`}>{car.name}</span>
                                                 </button>
                                                 <div className="flex gap-1 shrink-0 opacity-100">
-                                                     <button onClick={(e) => { e.stopPropagation(); const newName = prompt("Nuevo nombre:", car.name); if(newName) renameCar(car.id, newName); }} className="p-1 hover:bg-yellow-900/30 rounded text-slate-500 hover:text-yellow-400 transition" title="Editar Nombre"><Edit size={12}/></button>
-                                                     <button onClick={(e) => { e.stopPropagation(); setPreviewData({ type: 'CAR', subType: car.type, color: selectedLane === 1 ? '#ef4444' : '#3b82f6', obj: car.customData?.obj, mtl: car.customData?.mtl, tex: car.customData?.tex, name: car.name }); }} className="p-1 hover:bg-cyan-900/30 rounded text-slate-500 hover:text-cyan-400 transition" title="Ver 3D"><Eye size={12}/></button>
-                                                     <button onClick={(e) => { e.stopPropagation(); deleteCustomItem('car', car.id); }} className="p-1 hover:bg-red-900/30 rounded text-slate-500 hover:text-red-400 transition" title="Eliminar"><Trash2 size={12}/></button>
+                                                     <button onClick={(e) => { e.stopPropagation(); const newName = prompt("Nuevo nombre:", car.name); if(newName) renameCar(car.id, newName); speak("Editar nombre"); }} className="p-1 hover:bg-yellow-900/30 rounded text-slate-500 hover:text-yellow-400 transition" title="Editar Nombre"><Edit size={12}/></button>
+                                                     <button onClick={(e) => { e.stopPropagation(); setPreviewData({ type: 'CAR', subType: car.type, color: selectedLane === 1 ? '#ef4444' : '#3b82f6', obj: car.customData?.obj, mtl: car.customData?.mtl, tex: car.customData?.tex, name: car.name }); speak("Vista Previa"); }} className="p-1 hover:bg-cyan-900/30 rounded text-slate-500 hover:text-cyan-400 transition" title="Ver 3D"><Eye size={12}/></button>
+                                                     <button onClick={(e) => { e.stopPropagation(); deleteCustomItem('car', car.id); speak("Eliminar coche"); }} className="p-1 hover:bg-red-900/30 rounded text-slate-500 hover:text-red-400 transition" title="Eliminar"><Trash2 size={12}/></button>
                                                 </div>
                                             </div>
                                         ))}
@@ -1063,14 +1235,14 @@
                                             <div className="flex justify-between items-center mb-1">
                                                 <span className="text-[9px] font-bold text-slate-500 uppercase">Coche: {activeCarData.name}</span>
                                                 {selectedCarModelId.startsWith('custom-') && (
-                                                    <button onClick={() => deleteCustomItem('car', selectedCarModelId)} className="text-[8px] text-red-500 hover:text-red-400 bg-red-900/20 px-1 rounded border border-red-900/50"><Trash2 size={10}/></button>
+                                                    <button onClick={() => { deleteCustomItem('car', selectedCarModelId); speak("Eliminar coche seleccionado"); }} className="text-[8px] text-red-500 hover:text-red-400 bg-red-900/20 px-1 rounded border border-red-900/50"><Trash2 size={10}/></button>
                                                 )}
                                             </div>
                                             <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide snap-x">
                                                 {allCars.map(car => (
-                                                    <div key={car.id} onClick={() => setSelectedCarModelId(car.id)} className={`cursor-pointer snap-start min-w-[70px] p-1 rounded border flex flex-col items-center justify-center gap-1 transition relative group ${selectedCarModelId === car.id ? 'bg-slate-800 border-cyan-500' : 'border-slate-700 hover:bg-slate-800'}`}>
+                                                    <div key={car.id} onClick={() => { setSelectedCarModelId(car.id); speak(car.name); }} className={`cursor-pointer snap-start min-w-[70px] p-1 rounded border flex flex-col items-center justify-center gap-1 transition relative group ${selectedCarModelId === car.id ? 'bg-slate-800 border-cyan-500' : 'border-slate-700 hover:bg-slate-800'}`}>
                                                         <div className="w-full h-5 bg-gray-700 rounded flex items-center justify-center text-[7px] text-white font-bold">{car.type.substring(0,3)}</div>
-                                                        <button onClick={(e) => { e.stopPropagation(); setPreviewData({ type: 'CAR', subType: car.type, color: selectedLane === 1 ? '#ef4444' : '#3b82f6', obj: car.customData?.obj, mtl: car.customData?.mtl, tex: car.customData?.tex, name: car.name }); }} className="absolute top-0 right-0 p-1 bg-black/70 hover:bg-cyan-600 rounded-full text-white opacity-0 group-hover:opacity-100 transition-all z-10" title="Vista Previa 3D"><Eye size={10} /></button>
+                                                        <button onClick={(e) => { e.stopPropagation(); setPreviewData({ type: 'CAR', subType: car.type, color: selectedLane === 1 ? '#ef4444' : '#3b82f6', obj: car.customData?.obj, mtl: car.customData?.mtl, tex: car.customData?.tex, name: car.name }); speak("Vista Previa"); }} className="absolute top-0 right-0 p-1 bg-black/70 hover:bg-cyan-600 rounded-full text-white opacity-0 group-hover:opacity-100 transition-all z-10" title="Vista Previa 3D"><Eye size={10} /></button>
                                                     </div>
                                                 ))}
                                             </div>
@@ -1084,11 +1256,11 @@
                                             <input type="text" placeholder="Nombre del Bólido..." className="w-full bg-slate-800 border border-slate-600 rounded p-1.5 text-[10px] text-white mb-2 focus:border-cyan-500 outline-none font-bold" value={importState.name} onChange={(e) => setImportState(prev => ({...prev, name: e.target.value}))} />
                                             <div className="grid grid-cols-3 gap-1 mb-2">
                                                 <input type="file" ref={objInputRef} onChange={(e) => handleImportFile('obj', e)} accept=".obj" className="hidden" />
-                                                <button onClick={() => objInputRef.current.click()} className={`btn-tile h-10 flex-col gap-0 ${importState.obj ? 'border-green-500 text-green-400 bg-green-900/10' : 'bg-slate-800'}`} title="Cargar Modelo 3D"><Plus size={12}/><span className="btn-label mt-0">OBJ</span></button>
+                                                <button onClick={() => { objInputRef.current.click(); speak("Cargar O B J"); }} className={`btn-tile h-10 flex-col gap-0 ${importState.obj ? 'border-green-500 text-green-400 bg-green-900/10' : 'bg-slate-800'}`} title="Cargar Modelo 3D"><Plus size={12}/><span className="btn-label mt-0">OBJ</span></button>
                                                 <input type="file" ref={mtlInputRef} onChange={(e) => handleImportFile('mtl', e)} accept=".mtl" className="hidden" />
-                                                <button onClick={() => mtlInputRef.current.click()} className={`btn-tile h-10 flex-col gap-0 ${importState.mtl ? 'border-green-500 text-green-400 bg-green-900/10' : 'bg-slate-800'}`} title="Cargar Materiales"><Upload size={12}/><span className="btn-label mt-0">MTL</span></button>
+                                                <button onClick={() => { mtlInputRef.current.click(); speak("Cargar M T L"); }} className={`btn-tile h-10 flex-col gap-0 ${importState.mtl ? 'border-green-500 text-green-400 bg-green-900/10' : 'bg-slate-800'}`} title="Cargar Materiales"><Upload size={12}/><span className="btn-label mt-0">MTL</span></button>
                                                 <input type="file" ref={imgInputRef} onChange={(e) => handleImportFile('tex', e)} accept="image/png, image/jpeg" className="hidden" />
-                                                <button onClick={() => imgInputRef.current.click()} className={`btn-tile h-10 flex-col gap-0 ${importState.tex ? 'border-green-500 text-green-400 bg-green-900/10' : 'bg-slate-800'}`} title="Cargar Textura/Skin"><ImageIcon size={12}/><span className="btn-label mt-0">PNG</span></button>
+                                                <button onClick={() => { imgInputRef.current.click(); speak("Cargar Piel"); }} className={`btn-tile h-10 flex-col gap-0 ${importState.tex ? 'border-green-500 text-green-400 bg-green-900/10' : 'bg-slate-800'}`} title="Cargar Textura/Skin"><ImageIcon size={12}/><span className="btn-label mt-0">PNG</span></button>
                                             </div>
                                             
                                             {importState.obj && (
@@ -1110,11 +1282,11 @@
 
                                         <div className="bg-slate-900/50 p-2 rounded border border-slate-800 mb-2">
                                             <div className="flex justify-between items-center mb-1"><span className="text-[9px] font-bold text-slate-500 uppercase">Motor: {selectedMotor.name}</span>{selectedMotor.id.startsWith('custom-') && (<button onClick={() => deleteCustomItem('motor', selectedMotor.id)} className="text-[8px] text-red-500 hover:text-red-400 bg-red-900/20 px-1 rounded border border-red-900/50"><Trash2 size={10}/></button>)}</div>
-                                            <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">{motors.map(m => (<button key={m.id} onClick={() => setSelectedMotor(m)} className={`min-w-[50px] h-[50px] p-1 rounded border flex items-center justify-center transition ${selectedMotor.id === m.id ? 'bg-yellow-900/30 border-yellow-500 shadow-[0_0_10px_#eab308]' : 'border-slate-700 hover:bg-slate-800'}`}><div className="scale-75"><MotorIcon color={m.color} /></div></button>))}<button onClick={addMotor} className="min-w-[50px] h-[50px] rounded border border-dashed border-slate-600 flex flex-col items-center justify-center text-slate-500 hover:text-green-400 hover:border-green-500 transition"><Plus size={20}/></button></div>
+                                            <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">{motors.map(m => (<button key={m.id} onClick={() => { setSelectedMotor(m); speak(m.name); }} className={`min-w-[50px] h-[50px] p-1 rounded border flex items-center justify-center transition ${selectedMotor.id === m.id ? 'bg-yellow-900/30 border-yellow-500 shadow-[0_0_10px_#eab308]' : 'border-slate-700 hover:bg-slate-800'}`}><div className="scale-75"><MotorIcon color={m.color} /></div></button>))}<button onClick={addMotor} className="min-w-[50px] h-[50px] rounded border border-dashed border-slate-600 flex flex-col items-center justify-center text-slate-500 hover:text-green-400 hover:border-green-500 transition"><Plus size={20}/></button></div>
                                         </div>
                                         <div className="bg-slate-900/50 p-2 rounded border border-slate-800 mb-2">
                                             <div className="flex justify-between items-center mb-1"><span className="text-[9px] font-bold text-slate-500 uppercase">Gomas: {selectedTire.name}</span>{selectedTire.id.startsWith('custom-') && (<button onClick={() => deleteCustomItem('tire', selectedTire.id)} className="text-[8px] text-red-500 hover:text-red-400 bg-red-900/20 px-1 rounded border border-red-900/50"><Trash2 size={10}/></button>)}</div>
-                                            <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">{tires.map(t => (<button key={t.id} onClick={() => setSelectedTire(t)} className={`min-w-[50px] h-[50px] p-1 rounded border flex items-center justify-center transition ${selectedTire.id === t.id ? 'bg-blue-900/30 border-blue-500 shadow-[0_0_10px_#3b82f6]' : 'border-slate-700 hover:bg-slate-800'}`}><div className="scale-75"><TireIcon color={t.color} label={t.label} /></div></button>))}<button onClick={addTire} className="min-w-[50px] h-[50px] rounded border border-dashed border-slate-600 flex flex-col items-center justify-center text-slate-500 hover:text-green-400 hover:border-green-500 transition"><Plus size={20}/></button></div>
+                                            <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">{tires.map(t => (<button key={t.id} onClick={() => { setSelectedTire(t); speak(t.name); }} className={`min-w-[50px] h-[50px] p-1 rounded border flex items-center justify-center transition ${selectedTire.id === t.id ? 'bg-blue-900/30 border-blue-500 shadow-[0_0_10px_#3b82f6]' : 'border-slate-700 hover:bg-slate-800'}`}><div className="scale-75"><TireIcon color={t.color} label={t.label} /></div></button>))}<button onClick={addTire} className="min-w-[50px] h-[50px] rounded border border-dashed border-slate-600 flex flex-col items-center justify-center text-slate-500 hover:text-green-400 hover:border-green-500 transition"><Plus size={20}/></button></div>
                                         </div>
                                         
                                         <div className="bg-slate-900/50 p-2 rounded border border-slate-800">
@@ -1148,7 +1320,7 @@
                                 <h3 className="text-xl font-bold text-white mb-2">{confirmModal.isAlert ? "Información" : "Confirmar Acción"}</h3>
                                 <p className="text-slate-300 mb-6 font-medium">{confirmModal.message}</p>
                                 <div className="flex gap-3 justify-end">
-                                    {!confirmModal.isAlert && (<button onClick={() => setConfirmModal(null)} className="px-4 py-2 rounded bg-slate-700 hover:bg-slate-600 text-white font-bold transition">Cancelar</button>)}
+                                    {!confirmModal.isAlert && (<button onClick={() => { setConfirmModal(null); speak("Cancelar"); }} className="px-4 py-2 rounded bg-slate-700 hover:bg-slate-600 text-white font-bold transition">Cancelar</button>)}
                                     <button onClick={confirmModal.onConfirm} className="px-4 py-2 rounded bg-red-600 hover:bg-red-500 text-white font-bold transition shadow-lg">{confirmModal.isAlert ? "Entendido" : "Sí, continuar"}</button>
                                 </div>
                             </div>
@@ -1162,7 +1334,7 @@
                                 <h2 className="text-xs font-black text-white mb-3 text-center uppercase tracking-widest border-b border-slate-700 pb-2 flex items-center justify-center gap-2"><Ruler size={14} className="text-blue-500"/> Configuración Inicial</h2>
                                 <div className="space-y-3">
                                     <div className="flex gap-2"><div><label className="block text-[9px] font-bold text-slate-400 uppercase mb-1">Largo (cm)</label><input type="number" value={inputSize.width} onChange={e=>setInputSize({...inputSize, width: e.target.value})} className="w-full bg-slate-800 border border-slate-600 rounded p-1.5 text-white text-sm font-bold text-center focus:border-blue-500 outline-none transition" /></div><div><label className="block text-[9px] font-bold text-slate-400 uppercase mb-1">Ancho (cm)</label><input type="number" value={inputSize.length} onChange={e=>setInputSize({...inputSize, length: e.target.value})} className="w-full bg-slate-800 border border-slate-600 rounded p-1.5 text-white text-sm font-bold text-center focus:border-blue-500 outline-none transition" /></div></div>
-                                    <div><label className="block text-[9px] font-bold text-slate-400 uppercase mb-1">Sistema de Pista</label><div className="flex gap-1"><button onClick={()=>setCurrentSystem('ninco')} className={`flex-1 py-1.5 rounded text-[9px] font-bold border transition ${currentSystem === 'ninco' ? 'bg-red-900/50 border-red-500 text-white' : 'bg-slate-800 border-slate-600 text-slate-500 hover:bg-slate-700'}`}>NINCO 1:32</button><button onClick={()=>setCurrentSystem('scaleauto')} className={`flex-1 py-1.5 rounded text-[9px] font-bold border transition ${currentSystem === 'scaleauto' ? 'bg-yellow-900/50 border-yellow-500 text-white' : 'bg-slate-800 border-slate-600 text-slate-500 hover:bg-slate-700'}`}>SCALE 1:24</button></div></div>
+                                    <div><label className="block text-[9px] font-bold text-slate-400 uppercase mb-1">Sistema de Pista</label><div className="flex gap-1"><button onClick={()=> { setCurrentSystem('ninco'); speak("Sistema Ninco"); }} className={`flex-1 py-1.5 rounded text-[9px] font-bold border transition ${currentSystem === 'ninco' ? 'bg-red-900/50 border-red-500 text-white' : 'bg-slate-800 border-slate-600 text-slate-500 hover:bg-slate-700'}`}>NINCO 1:32</button><button onClick={()=> { setCurrentSystem('scaleauto'); speak("Sistema Scaleauto"); }} className={`flex-1 py-1.5 rounded text-[9px] font-bold border transition ${currentSystem === 'scaleauto' ? 'bg-yellow-900/50 border-yellow-500 text-white' : 'bg-slate-800 border-slate-600 text-slate-500 hover:bg-slate-700'}`}>SCALE 1:24</button></div></div>
                                     <button onClick={startBuilder} className="w-full bg-blue-600 hover:bg-blue-700 text-white font-black text-sm py-2 rounded transition shadow-lg border-b-2 border-blue-800 active:border-b-0 active:translate-y-0.5 mt-2 flex items-center justify-center gap-2">EMPEZAR <ArrowRight size={14}/></button>
                                 </div>
                             </div>
@@ -1171,7 +1343,7 @@
                     {viewMode === 'report' && (
                         <div className="report-view">
                             <div className="flex justify-between items-center w-full px-4 py-3 bg-white border-b border-gray-200 sticky top-0 z-10 no-print shadow-sm">
-                                <button onClick={()=>setViewMode('editor')} className="flex items-center gap-2 bg-gray-200 text-gray-800 px-6 py-3 rounded hover:bg-gray-300 font-bold text-sm transition"><ArrowLeft size={18}/> VOLVER</button>
+                                <button onClick={()=> { setViewMode('editor'); speak("Volver al editor"); }} className="flex items-center gap-2 bg-gray-200 text-gray-800 px-6 py-3 rounded hover:bg-gray-300 font-bold text-sm transition"><ArrowLeft size={18}/> VOLVER</button>
                                 <button onClick={downloadPDF} className="flex items-center gap-2 bg-blue-600 text-white px-6 py-3 rounded hover:bg-blue-700 font-bold text-sm shadow transition"><FileDown size={18}/> DESCARGAR PDF</button>
                             </div>
                             <div id="printable-area" className="bg-white">
