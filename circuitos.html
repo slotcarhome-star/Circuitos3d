@@ -151,7 +151,7 @@
             Bot, User, Activity, StopCircle, RefreshCw, Clock, Save, FolderOpen,
             Move3d, MousePointer2, PlayCircle, StopCircle as StopIcon, Truck, History, Upload, FileBox,
             Database, TreePine, Trees, BoxSelect, Eye, Image as ImageIcon,
-            Layers, Edit, Maximize
+            Layers, Edit, Maximize, KeyRound
         } from 'lucide-react';
 
         // --- GLOBAL VOICE FUNCTION ---
@@ -171,72 +171,24 @@
         };
 
         const MAGNET_FORCE = 25.0; 
+        const LOCK_CODE = "1234"; // CÓDIGO POR DEFECTO
 
         // --- CONFIGURACIÓN COCHES DEL SERVIDOR (CARPETA LOCAL) ---
-        // Aquí defines qué ficheros tiene cada coche. 
-        // ¡IMPORTANTE! Asegúrate de subir estos ficheros a la misma carpeta que el index.html.
-        // Si no tienes alguno (ej. tex), déjalo como null.
         const SERVER_CARS = [
             {
                 id: 'server_car_sport',
-                name: "Sports Car",          // Nombre que ven los usuarios
+                name: "Sports Car",          
                 files: {
-                    obj: "./SportsCar.obj",  // Archivo OBJ (Obligatorio)
-                    mtl: "./SportsCar.mtl",  // Archivo MTL (Si no hay, usa null)
-                    tex: null                // Archivo IMAGEN JPG/PNG (Si no hay, usa null. Ej: "./SportsCar.png")
+                    obj: "./SportsCar.obj",  
+                    mtl: "./SportsCar.mtl",  
+                    tex: null                
                 },
-                // AJUSTA AQUÍ SI EL COCHE SALE MAL POSICIONADO
-                // CORRECCIÓN: Rotación a 180 para que el morro mire adelante
                 specs: { offset: {x:0, y:0, z:0}, rotation: {y:180, z:0, x:0} },
                 color: '#ffffff'
             },
-            
-            // Ejemplo para añadir un coche con los 3 ficheros (Descomentar y editar):
-            /*
-            {
-                id: 'mi_coche_rally',
-                name: "Rally WRC",
-                files: { 
-                    obj: "./RallyCar.obj", 
-                    mtl: "./RallyCar.mtl", 
-                    tex: "./RallyCar.png" 
-                },
-                specs: { offset: {x:0, y:0, z:0}, rotation: {y:-90, z:0, x:0} },
-                color: '#ffffff'
-            }
-            */
         ];
 
-        // --- CONFIGURACIÓN DECORACIÓN DEL SERVIDOR (NUEVO) ---
-        // Añade aquí edificios, árboles, vallas, etc. que subas a la carpeta.
-        const SERVER_DECOS = [
-            // Ejemplo de OBJETO 3D (Descomentar y editar):
-            /*
-            {
-                id: 'server_deco_tribuna',
-                name: "Tribuna Principal",
-                type: 'MODEL', // Usa 'MODEL' para 3D
-                files: {
-                    obj: "./tribuna.obj",
-                    mtl: "./tribuna.mtl",
-                    tex: null 
-                }
-            },
-            */
-            // Ejemplo de IMAGEN 2D (Cartel, fondo, etc.):
-            /*
-            {
-                id: 'server_deco_cartel',
-                name: "Cartel Patrocinador",
-                type: 'IMAGE', // Usa 'IMAGE' para 2D
-                files: {
-                    obj: null,
-                    mtl: null,
-                    tex: "./logo_sponsor.png"
-                }
-            }
-            */
-        ];
+        const SERVER_DECOS = [];
 
         const PRESET_CARS = [
             // Carga dinámica de los coches definidos en SERVER_CARS
@@ -267,7 +219,6 @@
         ];
 
         const BASE_DECOS = [
-            // Carga dinámica de DECORACIÓN definida en SERVER_DECOS
             ...SERVER_DECOS.map(deco => ({
                 id: deco.id,
                 name: deco.name,
@@ -312,6 +263,7 @@
         const MotorIcon = ({ color }) => (<svg width="40" height="40" viewBox="0 0 100 100" className="opacity-90"><rect x="20" y="25" width="60" height="50" rx="5" fill="#334155" stroke={color} strokeWidth="3" /><rect x="15" y="35" width="5" height="30" fill="#94a3b8" /><rect x="80" y="35" width="5" height="30" fill="#94a3b8" /><rect x="90" y="45" width="10" height="10" fill="#cbd5e1" /><path d="M40 25 L40 75 M60 25 L60 75" stroke="#475569" strokeWidth="2" /><text x="50" y="55" textAnchor="middle" fill={color} fontSize="14" fontWeight="bold">NC</text></svg>);
         const TireIcon = ({ color, label }) => (<svg width="40" height="40" viewBox="0 0 100 100" className="opacity-90"><circle cx="50" cy="50" r="40" fill="#1a1a1a" stroke={color} strokeWidth="3" /><circle cx="50" cy="50" r="25" fill="#333" stroke="#555" strokeWidth="1" /><path d="M50 10 L50 30 M50 70 L50 90 M90 50 L70 50 M30 50 L10 50" stroke="#222" strokeWidth="4" /><path d="M22 22 L36 36 M78 22 L64 36 M78 78 L64 64 M22 78 L36 64" stroke="#222" strokeWidth="4" /><text x="50" y="54" textAnchor="middle" fill={color} fontSize="12" fontWeight="bold">{label}</text></svg>);
 
+        // ... existing FinishLine, createStraightShape, createCurveShape, Wheel, StandardCar ...
         const FinishLine = ({ width }) => {
             const rows = 2; const size = 1.8; const cols = Math.floor((width - 1) / size); const startZ = -(cols * size) / 2; const TRACK_H = 0.6;
             const squares = useMemo(() => { const els = []; for(let r=0; r<rows; r++) { for(let c=0; c<cols; c++) { const isWhite = (r + c) % 2 === 0; els.push(<mesh key={`${r}-${c}`} position={[r * size, 0, startZ + c * size + size/2]} rotation={[-Math.PI/2, 0, 0]}><planeGeometry args={[size, size]} /><meshBasicMaterial color={isWhite ? '#ffffff' : '#111111'} /></mesh>); } } return els; }, [width, size, cols, startZ, rows]);
@@ -323,6 +275,7 @@
 
         const Wheel = ({ pos, radius = 1.1, width = 1.0, spokes = false, color = "#1a1a1a", rimColor = "#e2e8f0" }) => ( <group position={pos}> <mesh rotation={[Math.PI/2, 0, 0]} castShadow> <cylinderGeometry args={[radius, radius, width, 32]} /> <meshStandardMaterial color="#1a1a1a" roughness={0.9} /> </mesh> <mesh rotation={[Math.PI/2, 0, 0]} position={[0, 0, 0]}> <cylinderGeometry args={[radius * 0.65, radius * 0.65, width + 0.05, 16]} /> <meshStandardMaterial color={rimColor} metalness={0.8} roughness={0.2} /> </mesh> <mesh rotation={[Math.PI/2, 0, 0]} position={[0, 0, width/2 + 0.05]}> <cylinderGeometry args={[0.15, 0.15, 0.1, 6]} /> <meshStandardMaterial color={color} metalness={0.5} /> </mesh> </group> );
         const StandardCar = ({ color, rotationZ = 0, rotationX = 0, offsetY = 0, offsetZ = 0, offsetX = 0 }) => ( <group position={[offsetX || 0, 2.1 + offsetY, offsetZ]} rotation={[rotationX * Math.PI / 180, 0, rotationZ * Math.PI / 180]}> <mesh position={[0, 1.2, 0]} castShadow receiveShadow> <boxGeometry args={[13.5, 2.4, 6.0]} /> <meshStandardMaterial color={color} metalness={0.4} roughness={0.3} /> </mesh> <mesh position={[-1.5, 2.7, 0]} castShadow> <boxGeometry args={[6.0, 1.5, 4.8]} /> <meshStandardMaterial color="#111" metalness={0.8} /> </mesh> <Wheel pos={[4.5, 0, 3.1]} radius={2.1} width={1.2} /> <Wheel pos={[4.5, 0, -3.1]} radius={2.1} width={1.2} /> <Wheel pos={[-4.5, 0, 3.1]} radius={2.2} width={1.5} /> <Wheel pos={[-4.5, 0, -3.1]} radius={2.2} width={1.5} /> <mesh position={[-6.6, 3.0, 0]}><boxGeometry args={[1.5, 0.3, 6.0]} /><meshStandardMaterial color={color}/></mesh> </group> );
+
         const CustomCar = ({ objUrl, mtlUrl, texUrl, color, rotationZ = 0, rotationX = 0, offsetY = 0, offsetZ = 0, offsetX = 0 }) => { 
             const [model, setModel] = useState(null); 
             useEffect(() => { 
@@ -398,7 +351,7 @@
         };
         const CarModel = ({ type, color = "#dc2626", customData, rotationZ, rotationX, offsetY, offsetZ, offsetX }) => { if (type === 'CUSTOM_OBJ' && customData?.obj) { return <CustomCar objUrl={customData.obj} mtlUrl={customData.mtl} texUrl={customData.tex} color={color} rotationZ={rotationZ} rotationX={rotationX} offsetY={offsetY} offsetZ={offsetZ} offsetX={offsetX} />; } return <StandardCar color={color} rotationZ={rotationZ} rotationX={rotationX} offsetY={offsetY} offsetZ={offsetZ} offsetX={offsetX} />; };
 
-        // --- COMPONENTE DE DECORACIÓN MEJORADO (IMAGEN + OBJ) ---
+        // ... existing DecorationObject, DraggableDecoration, createTrackSpline, AnimatedCar ...
         const DecorationObject = ({ data }) => { 
             const [model, setModel] = useState(null);
             const [texture, setTexture] = useState(null);
@@ -755,6 +708,9 @@
             const [viewMode, setViewMode] = useState('editor'); 
             const [snapshotUrl, setSnapshotUrl] = useState(null);
 
+            const [editablePresetCars, setEditablePresetCars] = useState(PRESET_CARS);
+            const [isTuningLocked, setIsTuningLocked] = useState(true);
+
             useEffect(() => {
                 const loadPersistentData = async () => {
                     try {
@@ -763,6 +719,18 @@
                             const hydratedCars = savedCars.map(c => ({ ...c, customData: { obj: c.storage?.objBlob ? URL.createObjectURL(c.storage.objBlob) : null, mtl: c.storage?.mtlBlob ? URL.createObjectURL(c.storage.mtlBlob) : null, tex: c.storage?.texBlob ? URL.createObjectURL(c.storage.texBlob) : null } }));
                             setCustomCars(hydratedCars);
                         }
+                        
+                        // Cargar Overrides para coches Preset/Server
+                        const savedPresetSpecs = await get('ninco-preset-specs');
+                        if (savedPresetSpecs) {
+                            setEditablePresetCars(prev => prev.map(c => {
+                                if (savedPresetSpecs[c.id]) {
+                                    return { ...c, specs: savedPresetSpecs[c.id] };
+                                }
+                                return c;
+                            }));
+                        }
+
                         const savedDecos = await get('ninco-custom-decos');
                         if (savedDecos && Array.isArray(savedDecos)) {
                             const hydratedDecos = savedDecos.map(d => ({ ...d, customData: { obj: d.storage?.objBlob ? URL.createObjectURL(d.storage.objBlob) : null, mtl: d.storage?.mtlBlob ? URL.createObjectURL(d.storage.mtlBlob) : null, tex: d.storage?.texBlob ? URL.createObjectURL(d.storage.texBlob) : null } }));
@@ -921,11 +889,73 @@
                 speak("Pantalla completa");
             };
 
-            const [editablePresetCars, setEditablePresetCars] = useState(PRESET_CARS);
             const allCars = useMemo(() => [...editablePresetCars, ...customCars], [editablePresetCars, customCars]);
             const activeCarData = useMemo(() => { if (importState.obj) { return { id: 'preview_import', name: importState.name || 'PREVIEW', type: 'CUSTOM_OBJ', customData: { obj: importState.obj, mtl: importState.mtl, tex: importState.tex }, specs: tempSpecs }; } return allCars.find(c => c.id === selectedCarModelId) || editablePresetCars[0]; }, [allCars, selectedCarModelId, importState, tempSpecs, editablePresetCars]);
             
-            const updateCarSpec = (category, updateValues) => { if (importState.obj) { setTempSpecs(prev => { const oldCategory = prev[category] || {}; return { ...prev, [category]: { ...oldCategory, ...updateValues } }; }); return; } if (selectedCarModelId.startsWith('custom-')) { setCustomCars(prev => { const updated = prev.map(c => { if (c.id === selectedCarModelId) { const oldSpecs = c.specs || {}; const oldCategory = oldSpecs[category] || {}; const newCategory = { ...oldCategory, ...updateValues }; return { ...c, specs: { ...oldSpecs, [category]: newCategory } }; } return c; }); set('ninco-custom-cars', updated); return updated; }); } else { setEditablePresetCars(prev => prev.map(c => { if (c.id === selectedCarModelId) { const oldSpecs = c.specs || {}; const oldCategory = oldSpecs[category] || {}; const newCategory = { ...oldCategory, ...updateValues }; return { ...c, specs: { ...oldSpecs, [category]: newCategory } }; } return c; })); } };
+            const updateCarSpec = (category, updateValues) => { 
+                if (importState.obj) { 
+                    setTempSpecs(prev => { const oldCategory = prev[category] || {}; return { ...prev, [category]: { ...oldCategory, ...updateValues } }; }); 
+                    return; 
+                } 
+                if (selectedCarModelId.startsWith('custom-')) { 
+                    setCustomCars(prev => { 
+                        const updated = prev.map(c => { 
+                            if (c.id === selectedCarModelId) { 
+                                const oldSpecs = c.specs || {}; 
+                                const oldCategory = oldSpecs[category] || {}; 
+                                const newCategory = { ...oldCategory, ...updateValues }; 
+                                return { ...c, specs: { ...oldSpecs, [category]: newCategory } }; 
+                            } 
+                            return c; 
+                        }); 
+                        set('ninco-custom-cars', updated); 
+                        return updated; 
+                    }); 
+                } else { 
+                    setEditablePresetCars(prev => {
+                        const updated = prev.map(c => { 
+                            if (c.id === selectedCarModelId) { 
+                                const oldSpecs = c.specs || {}; 
+                                const oldCategory = oldSpecs[category] || {}; 
+                                const newCategory = { ...oldCategory, ...updateValues }; 
+                                return { ...c, specs: { ...oldSpecs, [category]: newCategory } }; 
+                            } 
+                            return c; 
+                        });
+                        
+                        // Guardar los overrides de los presets
+                        const specsToSave = {};
+                        updated.forEach(c => {
+                             if(c.specs) specsToSave[c.id] = c.specs;
+                        });
+                        set('ninco-preset-specs', specsToSave);
+                        
+                        return updated; 
+                    }); 
+                } 
+            };
+            const saveCurrentSpecs = () => {
+                 speak("Posición Guardada");
+                 // Visual feedback handled by UI implicitly via state, explicit save already happens in updateCarSpec
+                 // but we trigger a small notification
+                 const btn = document.getElementById('save-specs-btn');
+                 if(btn) {
+                     const oldText = btn.innerHTML;
+                     btn.innerHTML = '<span class="text-green-400 font-bold">¡GUARDADO!</span>';
+                     setTimeout(() => btn.innerHTML = oldText, 1000);
+                 }
+            };
+            
+            const unlockTuning = () => {
+                const code = prompt("Introduce el código de desbloqueo:");
+                if (code === LOCK_CODE) {
+                    setIsTuningLocked(false);
+                    speak("Menú desbloqueado");
+                } else {
+                    speak("Código incorrecto");
+                }
+            };
+
             const handleImportFile = (type, e) => { const file = e.target.files[0]; if (!file) return; const url = URL.createObjectURL(file); setImportState(prev => ({ ...prev, [type]: url, [`${type}Blob`]: file })); if (type === 'obj') setTempSpecs({ offset: {x:0, y:0, z:0}, rotation: {y:-90, z:0, x:0} }); speak(`${type.toUpperCase()} Cargado`); };
             const saveImportedCar = () => { if (!importState.obj || !importState.name) { speak("Falta nombre o modelo"); return; } const newCar = { id: `custom-${Date.now()}`, name: importState.name, type: 'CUSTOM_OBJ', description: 'Personalizado', customData: { obj: importState.obj, mtl: importState.mtl, tex: importState.tex }, storage: { objBlob: importState.objBlob, mtlBlob: importState.mtlBlob, texBlob: importState.texBlob }, specs: JSON.parse(JSON.stringify(tempSpecs)) }; setCustomCars(prev => { const updated = [...prev, newCar]; set('ninco-custom-cars', updated); return updated; }); setImportState({ name: '', obj: null, mtl: null, tex: null, objBlob: null, mtlBlob: null, texBlob: null }); setSelectedCarModelId(newCar.id); speak("Bólido guardado"); };
             const renameCar = (id, newName) => { setCustomCars(prev => { const updated = prev.map(c => c.id === id ? { ...c, name: newName } : c); set('ninco-custom-cars', updated); return updated; }); speak("Nombre cambiado"); };
@@ -939,7 +969,7 @@
             const addMotor = () => { const newMotor = { id: `custom-${Date.now()}`, name: 'Nuevo Motor', rpm: 22000, torque: 1.1, color: '#ffffff' }; const updated = [...motors, newMotor]; setMotors(updated); setSelectedMotor(newMotor); set('ninco-motors', updated); speak("Motor añadido"); };
             const addTire = () => { const newTire = { id: `custom-${Date.now()}`, name: 'Custom', grip: 1.1, color: '#ffffff', label: 'CUST' }; const updated = [...tires, newTire]; setTires(updated); setSelectedTire(newTire); set('ninco-tires', updated); speak("Neumático añadido"); };
             const deleteCustomItem = (type, id) => { if (type === 'car') { setCustomCars(prev => { const updated = prev.filter(c => c.id !== id); set('ninco-custom-cars', updated); return updated; }); if (selectedCarModelId === id) setSelectedCarModelId('gt3_red'); } else if (type === 'motor') { setMotors(prev => { const updated = prev.filter(m => m.id !== id); set('ninco-motors', updated); return updated; }); if (selectedMotor.id === id) setSelectedMotor(INITIAL_MOTORS[0]); } else if (type === 'tire') { setTires(prev => { const updated = prev.filter(t => t.id !== id); set('ninco-tires', updated); return updated; }); if (selectedTire.id === id) setSelectedTire(INITIAL_TIRES[0]); } speak("Elemento borrado"); };
-            const clearSavedData = async () => { setConfirmModal({ message: "¿Borrar todo?", onConfirm: async () => { await set('ninco-custom-cars', []); await set('ninco-custom-decos', []); await set('ninco-motors', INITIAL_MOTORS); await set('ninco-tires', INITIAL_TIRES); setCustomCars([]); setCustomDecos([]); setMotors(INITIAL_MOTORS); setTires(INITIAL_TIRES); setSelectedCarModelId('gt3_red'); setConfirmModal(null); speak("Datos borrados"); } }); };
+            const clearSavedData = async () => { setConfirmModal({ message: "¿Borrar todo?", onConfirm: async () => { await set('ninco-custom-cars', []); await set('ninco-custom-decos', []); await set('ninco-preset-specs', {}); await set('ninco-motors', INITIAL_MOTORS); await set('ninco-tires', INITIAL_TIRES); setCustomCars([]); setCustomDecos([]); setEditablePresetCars(PRESET_CARS); setMotors(INITIAL_MOTORS); setTires(INITIAL_TIRES); setSelectedCarModelId('gt3_red'); setConfirmModal(null); speak("Datos borrados"); } }); };
             const saveCircuit = () => { const data = { version: 1, system: currentSystem, board: boardSize, segments: segments, decorations: placedDecos }; const blob = new Blob([JSON.stringify(data)], { type: 'application/json' }); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = `circuito-${currentSystem}-${Date.now()}.json`; a.click(); URL.revokeObjectURL(url); speak("Circuito guardado"); };
             const loadCircuit = (e) => { const file = e.target.files[0]; if (!file) return; const reader = new FileReader(); reader.onload = (event) => { try { const data = JSON.parse(event.target.result); if (data.segments && data.system) { setCurrentSystem(data.system); setBoardSize(data.board || { width: 244, length: 122 }); const restoredSegments = data.segments.map(s => { const newPos = s.pos ? new THREE.Vector3(s.pos.x, s.pos.y, s.pos.z) : undefined; const newRot = s.rot ? new THREE.Euler(s.rot._x !== undefined ? s.rot._x : s.rot.x, s.rot._y !== undefined ? s.rot._y : s.rot.y, s.rot._z !== undefined ? s.rot._z : s.rot.z, s.rot._order || s.rot.order || 'XYZ') : undefined; const cleanSegment = { ...s }; if (newPos) cleanSegment.pos = newPos; if (newRot) cleanSegment.rot = newRot; return cleanSegment; }); setSegments(restoredSegments); setSelId(restoredSegments[0].id); if (data.decorations && Array.isArray(data.decorations)) { setPlacedDecos(data.decorations); } speak("Circuito cargado"); } else { setConfirmModal({ message: "Formato de archivo no válido", onConfirm: () => setConfirmModal(null), isAlert: true }); } } catch (err) { console.error(err); setConfirmModal({ message: "Error al leer el archivo.", onConfirm: () => setConfirmModal(null), isAlert: true }); } e.target.value = ''; }; reader.readAsText(file); };
 
@@ -973,6 +1003,7 @@
                             {/* BUILDER MODE TOOLS */}
                             {appMode === 'builder' && viewMode === 'editor' && !decoMode && (
                                 <>
+                                    {/* ... existing sidebar sections ... */}
                                     <div className="sidebar-section">
                                         <div className="flex justify-between items-center mb-1">
                                             <div className="sidebar-section-title mb-0">Espacio de Trabajo</div>
@@ -1161,6 +1192,7 @@
                             {/* RACER MODE TOOLS */}
                             {appMode === 'racer' && (
                                 <>
+                                    {/* ... existing racer controls ... */}
                                     <div className="sidebar-section">
                                         <div className="sidebar-section-title">Dirección de Carrera</div>
                                         {raceState === 'countdown' ? (
@@ -1205,7 +1237,6 @@
                                         </div>
                                     </div>
 
-                            {/* SECCIÓN GARAJE COCHES AÑADIDA */}
                             {customCars.length > 0 && (
                                 <div className="sidebar-section">
                                     <div className="sidebar-section-title flex justify-between items-center">
@@ -1249,43 +1280,63 @@
                                             </div>
                                         </div>
 
-                                        {/* PANEL DE GEOMETRÍA PERMANENTE - NUEVO */}
-                                        <div className="bg-slate-900/50 p-3 rounded border border-slate-800 mb-2 shadow-[0_0_15px_rgba(234,179,8,0.05)]">
-                                             <div className="flex items-center gap-2 border-b border-slate-700 pb-2 mb-2">
-                                                <Settings2 size={12} className="text-yellow-500"/>
-                                                <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">GEOMETRÍA Y AJUSTES</span>
-                                            </div>
-                                            <div className="space-y-2">
-                                                <div className="text-[7px] text-slate-500 uppercase font-bold text-center mb-1 border-b border-slate-800 pb-1">Ajuste de Posición (Coordenadas)</div>
-                                                <div className="flex flex-col"><div className="flex justify-between"><span className="text-[8px] font-bold text-slate-500">LONGITUDINAL (X)</span><span className="text-[8px] text-cyan-400">{activeCarData.specs?.offset?.x || 0}</span></div><input type="range" min="-10" max="10" step="0.1" value={activeCarData.specs?.offset?.x || 0} onChange={(e) => updateCarSpec('offset', { x: parseFloat(e.target.value) })} className="h-1 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-cyan-500"/></div>
-                                                <div className="flex flex-col"><div className="flex justify-between"><span className="text-[8px] font-bold text-slate-500">ALTURA (Y)</span><span className="text-[8px] text-cyan-400">{activeCarData.specs?.offset?.y || 0}</span></div><input type="range" min="-5" max="10" step="0.1" value={activeCarData.specs?.offset?.y || 0} onChange={(e) => updateCarSpec('offset', { y: parseFloat(e.target.value) })} className="h-1 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-cyan-500"/></div>
-                                                <div className="flex flex-col"><div className="flex justify-between"><span className="text-[8px] font-bold text-slate-500">LATERAL (Z)</span><span className="text-[8px] text-cyan-400">{activeCarData.specs?.offset?.z || 0}</span></div><input type="range" min="-5" max="5" step="0.1" value={activeCarData.specs?.offset?.z || 0} onChange={(e) => updateCarSpec('offset', { z: parseFloat(e.target.value) })} className="h-1 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-cyan-500"/></div>
-                                                <div className="text-[7px] text-slate-500 uppercase font-bold text-center mb-1 mt-2 border-b border-slate-800 pb-1">Ajuste de Rotación</div>
-                                                <div className="flex flex-col"><div className="flex justify-between"><span className="text-[8px] font-bold text-yellow-500">CABECEO (X)</span><span className="text-[8px] text-yellow-400">{activeCarData.specs?.rotation?.x || 0}°</span></div><input type="range" min="-180" max="180" step="5" value={activeCarData.specs?.rotation?.x || 0} onChange={(e) => updateCarSpec('rotation', { x: parseInt(e.target.value) })} className="h-1 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-yellow-500"/></div>
-                                                <div className="flex flex-col"><div className="flex justify-between"><span className="text-[8px] font-bold text-slate-500">DIRECCIÓN (Y)</span><span className="text-[8px] text-cyan-400">{activeCarData.specs?.rotation?.y || 0}°</span></div><input type="range" min="0" max="360" step="5" value={activeCarData.specs?.rotation?.y || 0} onChange={(e) => updateCarSpec('rotation', { y: parseInt(e.target.value) })} className="h-1 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-cyan-500"/></div>
-                                                <div className="flex flex-col"><div className="flex justify-between"><span className="text-[8px] font-bold text-slate-500">VUELCO (Z)</span><span className="text-[8px] text-cyan-400">{activeCarData.specs?.rotation?.z || 0}°</span></div><input type="range" min="-180" max="180" step="5" value={activeCarData.specs?.rotation?.z || 0} onChange={(e) => updateCarSpec('rotation', { z: parseInt(e.target.value) })} className="h-1 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-cyan-500"/></div>
-                                            </div>
-                                        </div>
-
-                                        <div className="bg-slate-900/50 p-3 rounded border border-slate-800 mb-4 shadow-[0_0_15px_rgba(0,255,255,0.05)]">
-                                            <div className="flex items-center gap-2 border-b border-slate-700 pb-2 mb-2">
-                                                <div className={`w-2 h-2 rounded-full ${importState.obj ? 'bg-green-400 animate-pulse' : 'bg-slate-600'}`}></div>
-                                                <span className={`text-[10px] font-black uppercase tracking-widest ${importState.obj ? 'text-green-400' : 'text-slate-500'}`}>{importState.obj ? "VISTA PREVIA EN PISTA" : "LABORATORIO DE IMPORTACIÓN"}</span>
-                                            </div>
-                                            <input type="text" placeholder="Nombre del Bólido..." className="w-full bg-slate-800 border border-slate-600 rounded p-1.5 text-[10px] text-white mb-2 focus:border-cyan-500 outline-none font-bold" value={importState.name} onChange={(e) => setImportState(prev => ({...prev, name: e.target.value}))} />
-                                            <div className="grid grid-cols-3 gap-1 mb-2">
-                                                <input type="file" ref={objInputRef} onChange={(e) => handleImportFile('obj', e)} accept=".obj" className="hidden" />
-                                                <button onClick={() => { objInputRef.current.click(); speak("Cargar O B J"); }} className={`btn-tile h-10 flex-col gap-0 ${importState.obj ? 'border-green-500 text-green-400 bg-green-900/10' : 'bg-slate-800'}`} title="Cargar Modelo 3D"><Plus size={12}/><span className="btn-label mt-0">OBJ</span></button>
-                                                <input type="file" ref={mtlInputRef} onChange={(e) => handleImportFile('mtl', e)} accept=".mtl" className="hidden" />
-                                                <button onClick={() => { mtlInputRef.current.click(); speak("Cargar M T L"); }} className={`btn-tile h-10 flex-col gap-0 ${importState.mtl ? 'border-green-500 text-green-400 bg-green-900/10' : 'bg-slate-800'}`} title="Cargar Materiales"><Upload size={12}/><span className="btn-label mt-0">MTL</span></button>
-                                                <input type="file" ref={imgInputRef} onChange={(e) => handleImportFile('tex', e)} accept="image/png, image/jpeg" className="hidden" />
-                                                <button onClick={() => { imgInputRef.current.click(); speak("Cargar Piel"); }} className={`btn-tile h-10 flex-col gap-0 ${importState.tex ? 'border-green-500 text-green-400 bg-green-900/10' : 'bg-slate-800'}`} title="Cargar Textura/Skin"><ImageIcon size={12}/><span className="btn-label mt-0">PNG</span></button>
+                                        {/* PANEL DE GEOMETRÍA CON BLOQUEO */}
+                                        <div className="bg-slate-900/50 p-3 rounded border border-slate-800 mb-2 shadow-[0_0_15px_rgba(234,179,8,0.05)] relative overflow-hidden">
+                                             <div className="flex items-center gap-2 border-b border-slate-700 pb-2 mb-2 justify-between">
+                                                <div className="flex items-center gap-2">
+                                                    <Settings2 size={12} className="text-yellow-500"/>
+                                                    <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">GEOMETRÍA Y AJUSTES</span>
+                                                </div>
+                                                {isTuningLocked ? (
+                                                    <button onClick={unlockTuning} className="text-[9px] bg-red-900/30 text-red-400 px-2 py-0.5 rounded border border-red-900/50 flex items-center gap-1"><Lock size={10}/> BLOQUEADO</button>
+                                                ) : (
+                                                    <button onClick={() => setIsTuningLocked(true)} className="text-[9px] bg-green-900/30 text-green-400 px-2 py-0.5 rounded border border-green-900/50 flex items-center gap-1"><Unlock size={10}/> ABIERTO</button>
+                                                )}
                                             </div>
                                             
-                                            <div className="flex gap-1 mt-2">
-                                                <button onClick={saveImportedCar} className="btn-tile h-12 w-full bg-green-900/20 border-green-600 text-green-100 flex-row gap-2 hover:bg-green-800 hover:shadow-[0_0_15px_#22c55e]" title="Guardar configuración actual"><Save size={16}/><span className="btn-label mt-0 text-green-400 text-[10px]">GRABAR BÓLIDO</span></button>
-                                            </div>
+                                            {isTuningLocked ? (
+                                                <div className="flex flex-col items-center justify-center py-6 gap-2">
+                                                    <Lock size={24} className="text-slate-600"/>
+                                                    <span className="text-[9px] text-slate-500 uppercase font-bold">Menú protegido por código</span>
+                                                    <button onClick={unlockTuning} className="mt-2 bg-slate-800 hover:bg-slate-700 text-white text-[10px] py-1.5 px-4 rounded border border-slate-600 flex items-center gap-2"><KeyRound size={12}/> INTRODUCIR CÓDIGO</button>
+                                                </div>
+                                            ) : (
+                                                <div className="space-y-2">
+                                                    <div className="text-[7px] text-slate-500 uppercase font-bold text-center mb-1 border-b border-slate-800 pb-1">Ajuste de Posición (Coordenadas)</div>
+                                                    <div className="flex flex-col"><div className="flex justify-between"><span className="text-[8px] font-bold text-slate-500">LONGITUDINAL (X)</span><span className="text-[8px] text-cyan-400">{activeCarData.specs?.offset?.x || 0}</span></div><input type="range" min="-10" max="10" step="0.1" value={activeCarData.specs?.offset?.x || 0} onChange={(e) => updateCarSpec('offset', { x: parseFloat(e.target.value) })} className="h-1 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-cyan-500"/></div>
+                                                    <div className="flex flex-col"><div className="flex justify-between"><span className="text-[8px] font-bold text-slate-500">ALTURA (Y)</span><span className="text-[8px] text-cyan-400">{activeCarData.specs?.offset?.y || 0}</span></div><input type="range" min="-5" max="10" step="0.1" value={activeCarData.specs?.offset?.y || 0} onChange={(e) => updateCarSpec('offset', { y: parseFloat(e.target.value) })} className="h-1 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-cyan-500"/></div>
+                                                    <div className="flex flex-col"><div className="flex justify-between"><span className="text-[8px] font-bold text-slate-500">LATERAL (Z)</span><span className="text-[8px] text-cyan-400">{activeCarData.specs?.offset?.z || 0}</span></div><input type="range" min="-5" max="5" step="0.1" value={activeCarData.specs?.offset?.z || 0} onChange={(e) => updateCarSpec('offset', { z: parseFloat(e.target.value) })} className="h-1 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-cyan-500"/></div>
+                                                    <div className="text-[7px] text-slate-500 uppercase font-bold text-center mb-1 mt-2 border-b border-slate-800 pb-1">Ajuste de Rotación</div>
+                                                    <div className="flex flex-col"><div className="flex justify-between"><span className="text-[8px] font-bold text-yellow-500">CABECEO (X)</span><span className="text-[8px] text-yellow-400">{activeCarData.specs?.rotation?.x || 0}°</span></div><input type="range" min="-180" max="180" step="5" value={activeCarData.specs?.rotation?.x || 0} onChange={(e) => updateCarSpec('rotation', { x: parseInt(e.target.value) })} className="h-1 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-yellow-500"/></div>
+                                                    <div className="flex flex-col"><div className="flex justify-between"><span className="text-[8px] font-bold text-slate-500">DIRECCIÓN (Y)</span><span className="text-[8px] text-cyan-400">{activeCarData.specs?.rotation?.y || 0}°</span></div><input type="range" min="0" max="360" step="5" value={activeCarData.specs?.rotation?.y || 0} onChange={(e) => updateCarSpec('rotation', { y: parseInt(e.target.value) })} className="h-1 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-cyan-500"/></div>
+                                                    <div className="flex flex-col"><div className="flex justify-between"><span className="text-[8px] font-bold text-slate-500">VUELCO (Z)</span><span className="text-[8px] text-cyan-400">{activeCarData.specs?.rotation?.z || 0}°</span></div><input type="range" min="-180" max="180" step="5" value={activeCarData.specs?.rotation?.z || 0} onChange={(e) => updateCarSpec('rotation', { z: parseInt(e.target.value) })} className="h-1 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-cyan-500"/></div>
+                                                    
+                                                    <button id="save-specs-btn" onClick={saveCurrentSpecs} className="w-full mt-3 bg-green-900/30 border border-green-600 text-green-100 py-2 rounded text-[10px] font-bold hover:bg-green-800 hover:shadow-[0_0_15px_#22c55e] flex items-center justify-center gap-2 transition-all"><Save size={12}/> GUARDAR POSICIÓN</button>
+                                                </div>
+                                            )}
                                         </div>
+
+                                        {isTuningLocked === false && (
+                                            <div className="bg-slate-900/50 p-3 rounded border border-slate-800 mb-4 shadow-[0_0_15px_rgba(0,255,255,0.05)]">
+                                                <div className="flex items-center gap-2 border-b border-slate-700 pb-2 mb-2">
+                                                    <div className={`w-2 h-2 rounded-full ${importState.obj ? 'bg-green-400 animate-pulse' : 'bg-slate-600'}`}></div>
+                                                    <span className={`text-[10px] font-black uppercase tracking-widest ${importState.obj ? 'text-green-400' : 'text-slate-500'}`}>{importState.obj ? "VISTA PREVIA EN PISTA" : "LABORATORIO DE IMPORTACIÓN"}</span>
+                                                </div>
+                                                <input type="text" placeholder="Nombre del Bólido..." className="w-full bg-slate-800 border border-slate-600 rounded p-1.5 text-[10px] text-white mb-2 focus:border-cyan-500 outline-none font-bold" value={importState.name} onChange={(e) => setImportState(prev => ({...prev, name: e.target.value}))} />
+                                                <div className="grid grid-cols-3 gap-1 mb-2">
+                                                    <input type="file" ref={objInputRef} onChange={(e) => handleImportFile('obj', e)} accept=".obj" className="hidden" />
+                                                    <button onClick={() => { objInputRef.current.click(); speak("Cargar O B J"); }} className={`btn-tile h-10 flex-col gap-0 ${importState.obj ? 'border-green-500 text-green-400 bg-green-900/10' : 'bg-slate-800'}`} title="Cargar Modelo 3D"><Plus size={12}/><span className="btn-label mt-0">OBJ</span></button>
+                                                    <input type="file" ref={mtlInputRef} onChange={(e) => handleImportFile('mtl', e)} accept=".mtl" className="hidden" />
+                                                    <button onClick={() => { mtlInputRef.current.click(); speak("Cargar M T L"); }} className={`btn-tile h-10 flex-col gap-0 ${importState.mtl ? 'border-green-500 text-green-400 bg-green-900/10' : 'bg-slate-800'}`} title="Cargar Materiales"><Upload size={12}/><span className="btn-label mt-0">MTL</span></button>
+                                                    <input type="file" ref={imgInputRef} onChange={(e) => handleImportFile('tex', e)} accept="image/png, image/jpeg" className="hidden" />
+                                                    <button onClick={() => { imgInputRef.current.click(); speak("Cargar Piel"); }} className={`btn-tile h-10 flex-col gap-0 ${importState.tex ? 'border-green-500 text-green-400 bg-green-900/10' : 'bg-slate-800'}`} title="Cargar Textura/Skin"><ImageIcon size={12}/><span className="btn-label mt-0">PNG</span></button>
+                                                </div>
+                                                
+                                                <div className="flex gap-1 mt-2">
+                                                    <button onClick={saveImportedCar} className="btn-tile h-12 w-full bg-green-900/20 border-green-600 text-green-100 flex-row gap-2 hover:bg-green-800 hover:shadow-[0_0_15px_#22c55e]" title="Guardar configuración actual"><Save size={16}/><span className="btn-label mt-0 text-green-400 text-[10px]">GRABAR BÓLIDO</span></button>
+                                                </div>
+                                            </div>
+                                        )}
 
                                         <div className="bg-slate-900/50 p-2 rounded border border-slate-800 mb-2">
                                             <div className="flex justify-between items-center mb-1"><span className="text-[9px] font-bold text-slate-500 uppercase">Motor: {selectedMotor.name}</span>{selectedMotor.id.startsWith('custom-') && (<button onClick={() => deleteCustomItem('motor', selectedMotor.id)} className="text-[8px] text-red-500 hover:text-red-400 bg-red-900/20 px-1 rounded border border-red-900/50"><Trash2 size={10}/></button>)}</div>
@@ -1319,8 +1370,7 @@
                             )}
                         </div>
                     </div>
-
-                    {/* MODALS */}
+                    {/* ... existing modals ... */}
                     {confirmModal && (
                         <div className="absolute inset-0 z-[100] flex items-center justify-center bg-black/70 backdrop-blur-sm no-print animate-fade-in">
                             <div className="bg-slate-900 border border-slate-700 p-6 rounded-xl shadow-2xl max-w-sm w-full m-4 transform scale-100 transition-all">
