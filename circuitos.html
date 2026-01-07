@@ -186,8 +186,8 @@
                     tex: null                // Archivo IMAGEN JPG/PNG (Si no hay, usa null. Ej: "./SportsCar.png")
                 },
                 // AJUSTA AQUÍ SI EL COCHE SALE MAL POSICIONADO
-                // CORRECCIÓN: Rotación base ajustada en el loader, aquí dejamos 0.
-                specs: { offset: {x:0, y:0, z:0}, rotation: {y:0, z:0, x:0} },
+                // CORRECCIÓN: Rotación a 180 para que el morro mire adelante
+                specs: { offset: {x:0, y:0, z:0}, rotation: {y:180, z:0, x:0} },
                 color: '#ffffff'
             },
             
@@ -383,8 +383,7 @@
                         if (!mtlUrl && !texUrl) { 
                             obj.traverse((child) => { if (child.isMesh) { child.material.color.set(color); } }); 
                         } 
-                        // ROTACIÓN BASE CORREGIDA: Girado 180 grados respecto al anterior (de -Math.PI/2 a Math.PI/2)
-                        obj.rotation.y = Math.PI / 2; 
+                        obj.rotation.y = -Math.PI / 2; 
                         setModel(obj); 
                     } catch (e) { 
                         console.error("Error loading custom model", e); 
