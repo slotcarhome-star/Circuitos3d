@@ -295,22 +295,18 @@
                         if (materials) { objLoader.setMaterials(materials); } 
                         const obj = await objLoader.loadAsync(objUrl); 
                         
-                        // TEXTURE LOADING LOGIC (SAFE)
                         if (texUrl) { 
                             try {
                                 const textureLoader = new THREE.TextureLoader(); 
                                 const texture = await textureLoader.loadAsync(texUrl); 
                                 texture.colorSpace = THREE.SRGBColorSpace;
-                                
-                                // Aplicar textura a todas las mallas
                                 obj.traverse((child) => { 
                                     if (child.isMesh) { 
                                         const applyTex = (m) => {
                                             m.map = texture;
-                                            m.color.setHex(0xffffff); // Resetear color a blanco para que la textura se vea bien
+                                            m.color.setHex(0xffffff);
                                             m.needsUpdate = true;
                                         };
-                                        
                                         if (Array.isArray(child.material)) {
                                             child.material.forEach(applyTex);
                                         } else {
@@ -319,7 +315,7 @@
                                     } 
                                 }); 
                             } catch (texErr) {
-                                console.warn("Error cargando textura (continuando sin ella):", texUrl);
+                                console.warn("Error cargando textura:", texErr);
                             }
                         } 
                         
@@ -349,9 +345,9 @@
             if (!model) return <StandardCar color={color} rotationZ={rotationZ} rotationX={rotationX} offsetY={offsetY} offsetZ={offsetZ} offsetX={offsetX} />; 
             return ( <group position={[offsetX, 0.5 + offsetY, offsetZ]} rotation={[rotationX * Math.PI / 180, 0, rotationZ * Math.PI / 180]}> <primitive object={model} castShadow receiveShadow /> </group> ); 
         };
+
         const CarModel = ({ type, color = "#dc2626", customData, rotationZ, rotationX, offsetY, offsetZ, offsetX }) => { if (type === 'CUSTOM_OBJ' && customData?.obj) { return <CustomCar objUrl={customData.obj} mtlUrl={customData.mtl} texUrl={customData.tex} color={color} rotationZ={rotationZ} rotationX={rotationX} offsetY={offsetY} offsetZ={offsetZ} offsetX={offsetX} />; } return <StandardCar color={color} rotationZ={rotationZ} rotationX={rotationX} offsetY={offsetY} offsetZ={offsetZ} offsetX={offsetX} />; };
 
-        // ... existing DecorationObject, DraggableDecoration, createTrackSpline, AnimatedCar ...
         const DecorationObject = ({ data }) => { 
             const [model, setModel] = useState(null);
             const [texture, setTexture] = useState(null);
@@ -425,9 +421,70 @@
 
         const DraggableDecoration = ({ data, modelInfo, isSelected, isDecoMode, onUpdate, onSelect }) => { const { camera, raycaster, gl } = useThree(); const [isDragging, setIsDragging] = useState(false); const dragPlane = useMemo(() => new THREE.Plane(new THREE.Vector3(0, 1, 0), 0), []); const intersectPoint = useMemo(() => new THREE.Vector3(), []); const handlePointerDown = (e) => { if (!isDecoMode) return; e.stopPropagation(); onSelect(data.instanceId); setIsDragging(true); gl.domElement.style.cursor = 'grabbing'; }; useEffect(() => { const handleMove = (e) => { if (!isDragging) return; const rect = gl.domElement.getBoundingClientRect(); const x = ((e.clientX - rect.left) / rect.width) * 2 - 1; const y = -((e.clientY - rect.top) / rect.height) * 2 + 1; raycaster.setFromCamera(new THREE.Vector2(x, y), camera); if (raycaster.ray.intersectPlane(dragPlane, intersectPoint)) { onUpdate(data.instanceId, 'position', [intersectPoint.x, 0, intersectPoint.z]); } }; const handleUp = () => { setIsDragging(false); gl.domElement.style.cursor = 'auto'; }; if (isDragging) { window.addEventListener('pointermove', handleMove); window.addEventListener('pointerup', handleUp); } return () => { window.removeEventListener('pointermove', handleMove); window.removeEventListener('pointerup', handleUp); }; }, [isDragging, camera, raycaster, gl, dragPlane, onUpdate, data.instanceId]); return ( <group position={data.position} rotation={new THREE.Euler(data.rotation[0], data.rotation[1], data.rotation[2])} scale={[data.scale, data.scale, data.scale]} onPointerDown={handlePointerDown} onPointerOver={(e) => { if(isDecoMode) { e.stopPropagation(); gl.domElement.style.cursor = 'move'; } }} onPointerOut={(e) => { if(isDecoMode) gl.domElement.style.cursor = 'auto'; }} > <DecorationObject data={modelInfo} /> {isSelected && isDecoMode && ( <mesh position={[0, 6, 0]}> <boxGeometry args={[1, 14, 1]} /> <meshBasicMaterial color="yellow" wireframe /> </mesh> )} {isSelected && isDecoMode && ( <mesh position={[0, 0.1, 0]} rotation={[-Math.PI/2, 0, 0]}> <ringGeometry args={[5, 6, 32]} /> <meshBasicMaterial color="yellow" opacity={0.6} transparent /> </mesh> )} </group> ); };
 
-        const createTrackSpline = (chain, selectedLane, systemPieces, systemSpecs) => { const points = []; const segmentMap = []; const offset = systemSpecs.railOffset; let currentLaneOffset = selectedLane === 1 ? offset : -offset; const numCrosses = chain.filter(s => systemPieces[s.pId] && systemPieces[s.pId].isCross).length; const iterations = (numCrosses % 2 !== 0) ? 2 : 1; const SUBDIVISIONS_PER_UNIT = 2.0; const TRACK_H = 0.6; let isBroken = false; for (let loop = 0; loop < iterations; loop++) { if (isBroken) break; for (const seg of chain) { if (isBroken) break; const def = systemPieces[seg.pId]; if (!def) continue; let numSteps = 5; let segLength = 0; if (def.len) { numSteps = Math.max(10, Math.ceil(def.len * SUBDIVISIONS_PER_UNIT)); segLength = def.len; } else if (def.ang) { const arcLen = (def.ang * Math.PI / 180) * def.r; numSteps = Math.max(10, Math.ceil(arcLen * SUBDIVISIONS_PER_UNIT)); segLength = arcLen; } const isCurve = def.type === 'CURVE'; const radius = isCurve ? def.r : Infinity; const label = def.label; const dir = seg.dir; const startOffset = currentLaneOffset; const endOffset = def.isCross ? -currentLaneOffset : currentLaneOffset; for (let i = 0; i <= numSteps; i++) { const t = i / numSteps; const localPos = new THREE.Vector3(); if (def.type === 'STRAIGHT') { if (def.isCross) { const blend = (1 - Math.cos(t * Math.PI)) * 0.5; const currentZ = startOffset + (endOffset - startOffset) * blend; localPos.set(t * def.len, TRACK_H, currentZ); } else { localPos.set(t * def.len, TRACK_H, currentLaneOffset); } } else { const isLeft = seg.dir === 1; const Reff = isLeft ? (def.r + currentLaneOffset) : (def.r - currentLaneOffset); const angleRad = t * (def.ang * Math.PI / 180); if (isLeft) { const theta = -Math.PI/2 + angleRad; localPos.set(Reff * Math.cos(theta), TRACK_H, -(Reff * Math.sin(theta) + def.r)); } else { const theta = Math.PI/2 - angleRad; localPos.set(Reff * Math.cos(theta), TRACK_H, -(Reff * Math.sin(theta) - def.r)); } } localPos.applyMatrix4(seg.mat); if (points.length > 0 && i === 0) { const lastP = points[points.length - 1]; if (localPos.distanceTo(lastP) > 5.0) { isBroken = true; break; } } if (points.length === 0 || points[points.length-1].distanceTo(localPos) > 0.001) { points.push(localPos); } } if (!isBroken) { segmentMap.push({ length: segLength, isCurve, radius, label, dir }); if (def.isCross) { currentLaneOffset = endOffset; } } } } if (points.length < 2) return null; const closed = points.length > 2 && points[0].distanceTo(points[points.length-1]) < 20; const curve = new THREE.CatmullRomCurve3(points, closed, 'centripetal', 0.1); const splineLength = curve.getLength(); let accumulated = 0; const normalizedMap = segmentMap.map(s => { const startT = accumulated / splineLength; accumulated += s.length; const endT = accumulated / splineLength; return { ...s, startT, endT }; }); return { curve, totalLength: splineLength, closed, points, map: normalizedMap }; };
-        
-        const AnimatedCar = ({ tracks, throttle, isPlaying, isPaused, selectedLane = 1, onLap, motor, tires, voltage, weight, onDerail, driveMode, onTelemetry, totalLaps, systemId, resetToken, carModelId, carType, customData, modelRotation, modelRotationZ, modelRotationX, offsetY, offsetZ, offsetX, isRival = false, difficultyLevel = 3 }) => { 
+        const createTrackSpline = (chain, selectedLane, systemPieces, systemSpecs) => {
+            const points = [];
+            const segmentMap = [];
+            const offset = systemSpecs.railOffset;
+            let currentLaneOffset = selectedLane === 1 ? offset : -offset;
+            const numCrosses = chain.filter(s => systemPieces[s.pId] && systemPieces[s.pId].isCross).length;
+            const iterations = (numCrosses % 2 !== 0) ? 2 : 1;
+            const SUBDIVISIONS_PER_UNIT = 2.0;
+            const TRACK_H = 0.6;
+            let isBroken = false;
+            
+            for (let loop = 0; loop < iterations; loop++) {
+                if (isBroken) break;
+                for (const seg of chain) {
+                    if (isBroken) break;
+                    const def = systemPieces[seg.pId];
+                    if (!def) continue;
+                    let numSteps = 5; let segLength = 0;
+                    if (def.len) { numSteps = Math.max(10, Math.ceil(def.len * SUBDIVISIONS_PER_UNIT)); segLength = def.len; } 
+                    else if (def.ang) { const arcLen = (def.ang * Math.PI / 180) * def.r; numSteps = Math.max(10, Math.ceil(arcLen * SUBDIVISIONS_PER_UNIT)); segLength = arcLen; }
+                    
+                    const isCurve = def.type === 'CURVE';
+                    const radius = isCurve ? def.r : Infinity;
+                    const label = def.label;
+                    const dir = seg.dir;
+                    const startOffset = currentLaneOffset;
+                    const endOffset = def.isCross ? -currentLaneOffset : currentLaneOffset;
+                    
+                    for (let i = 0; i <= numSteps; i++) {
+                        const t = i / numSteps;
+                        const localPos = new THREE.Vector3();
+                        if (def.type === 'STRAIGHT') {
+                            if (def.isCross) {
+                                const blend = (1 - Math.cos(t * Math.PI)) * 0.5;
+                                const currentZ = startOffset + (endOffset - startOffset) * blend;
+                                localPos.set(t * def.len, TRACK_H, currentZ);
+                            } else { localPos.set(t * def.len, TRACK_H, currentLaneOffset); }
+                        } else {
+                            const isLeft = seg.dir === 1;
+                            const Reff = isLeft ? (def.r + currentLaneOffset) : (def.r - currentLaneOffset);
+                            const angleRad = t * (def.ang * Math.PI / 180);
+                            if (isLeft) { const theta = -Math.PI/2 + angleRad; localPos.set(Reff * Math.cos(theta), TRACK_H, -(Reff * Math.sin(theta) + def.r)); } 
+                            else { const theta = Math.PI/2 - angleRad; localPos.set(Reff * Math.cos(theta), TRACK_H, -(Reff * Math.sin(theta) - def.r)); }
+                        }
+                        localPos.applyMatrix4(seg.mat);
+                        if (points.length > 0 && i === 0) {
+                            const lastP = points[points.length - 1];
+                            if (localPos.distanceTo(lastP) > 5.0) { isBroken = true; break; }
+                        }
+                        if (points.length === 0 || points[points.length-1].distanceTo(localPos) > 0.001) { points.push(localPos); }
+                    }
+                    if (!isBroken) { segmentMap.push({ length: segLength, isCurve, radius, label, dir }); if (def.isCross) currentLaneOffset = endOffset; }
+                }
+            }
+            if (points.length < 2) return null;
+            const closed = points.length > 2 && points[0].distanceTo(points[points.length-1]) < 20;
+            const curve = new THREE.CatmullRomCurve3(points, closed, 'centripetal', 0.1);
+            const splineLength = curve.getLength();
+            let accumulated = 0;
+            const normalizedMap = segmentMap.map(s => { const startT = accumulated / splineLength; accumulated += s.length; const endT = accumulated / splineLength; return { ...s, startT, endT }; });
+            return { curve, totalLength: splineLength, closed, points, map: normalizedMap };
+        };
+
+        const AnimatedCar = ({ tracks, throttle, isPlaying, isPaused, selectedLane = 1, onLap, motor, tires, voltage, weight, onDerail, driveMode, onTelemetry, totalLaps, systemId, resetToken, carModelId, carType, customData, modelRotation, modelRotationZ, modelRotationX, offsetY, offsetZ, offsetX, isRival = false, difficultyLevel = 3, gripBoost = 1.0 }) => { 
             const carRef = useRef(); 
             const [velocity, setVelocity] = useState(0); 
             const [progress, setProgress] = useState(0); 
@@ -483,9 +540,12 @@
                 
                 let effectiveGrip = systemGrip + tireGrip * 0.5 + magnetGrip - weightPenalty;
                 
+                // APLICAR BOOST DE AGARRE (Usuario en modo Rival)
+                effectiveGrip *= gripBoost;
+                
                 if (isRival) {
-                    // Dificultad IA: Grip Scaler (Tortuga -> Experto)
-                    const gripMultipliers = [0.2, 0.4, 0.7, 1.0, 1.5]; 
+                    // Dificultad IA REDUCIDA A LA MITAD
+                    const gripMultipliers = [0.15, 0.25, 0.40, 0.60, 0.85]; 
                     const gripCheat = gripMultipliers[Math.max(0, Math.min(4, difficultyLevel - 1))];
                     effectiveGrip *= gripCheat;
                 }
@@ -497,11 +557,10 @@
                 let currentThrottle = throttle; 
                 
                 if (driveMode === 'ai' || isRival) {
-                    // Base Autopilot Throttle
+                    // Base Autopilot Throttle - Dificultad IA REDUCIDA
                     if (isRival) {
-                        // Dificultad IA: Acelerador Tope
-                        const baseAggression = 0.25 + (difficultyLevel * 0.15); 
-                        currentThrottle = Math.min(1.0, baseAggression + (motorFactor * 0.05));
+                        const baseAggression = 0.20 + (difficultyLevel * 0.11); 
+                        currentThrottle = Math.min(0.95, baseAggression + (motorFactor * 0.05));
                     } else {
                         currentThrottle = 0.9 + (motorFactor * 0.05); 
                     }
@@ -1596,7 +1655,34 @@
                                 {placedDecos.map(d => { let modelInfo = customDecos.find(c => c.id === d.modelId); if (!modelInfo) modelInfo = BASE_DECOS.find(b => b.id === d.modelId); return ( <DraggableDecoration key={d.instanceId} data={d} modelInfo={modelInfo} isSelected={selectedDecoInstance === d.instanceId} isDecoMode={decoMode} onUpdate={updateDecoInstance} onSelect={setSelectedDecoInstance} /> ); })}
                                 {carEnabled && chain.length > 0 && viewMode === 'editor' && (
                                     <>
-                                        <AnimatedCar tracks={tracks} throttle={carThrottle} isPlaying={raceState !== 'paused' && raceState !== 'countdown' && raceState !== 'finished'} isPaused={raceState === 'paused'} selectedLane={selectedLane} onLap={handleLap} motor={selectedMotor} tires={selectedTire} voltage={selectedVoltage} weight={bodyWeight + chassisWeight} onDerail={handleDerail} driveMode={driveMode} onTelemetry={handleTelemetry} totalLaps={targetLaps} systemId={currentSystem} resetToken={resetToken} carModelId={selectedCarModelId} carType={activeCarData.type} customData={activeCarData?.customData} modelRotation={activeCarData?.specs?.rotation?.y || 0} modelRotationZ={activeCarData?.specs?.rotation?.z || 0} modelRotationX={activeCarData?.specs?.rotation?.x || 0} offsetY={activeCarData?.specs?.offset?.y || 0} offsetZ={activeCarData?.specs?.offset?.z || 0} offsetX={activeCarData?.specs?.offset?.x || 0} />
+                                        <AnimatedCar 
+                                            tracks={tracks} 
+                                            throttle={carThrottle} 
+                                            isPlaying={raceState !== 'paused' && raceState !== 'countdown' && raceState !== 'finished'} 
+                                            isPaused={raceState === 'paused'} 
+                                            selectedLane={selectedLane} 
+                                            onLap={handleLap} 
+                                            motor={selectedMotor} 
+                                            tires={selectedTire} 
+                                            voltage={selectedVoltage} 
+                                            weight={bodyWeight + chassisWeight} 
+                                            onDerail={handleDerail} 
+                                            driveMode={driveMode} 
+                                            onTelemetry={handleTelemetry} 
+                                            totalLaps={targetLaps} 
+                                            systemId={currentSystem} 
+                                            resetToken={resetToken} 
+                                            carModelId={selectedCarModelId} 
+                                            carType={activeCarData.type} 
+                                            customData={activeCarData?.customData} 
+                                            modelRotation={activeCarData?.specs?.rotation?.y || 0} 
+                                            modelRotationZ={activeCarData?.specs?.rotation?.z || 0} 
+                                            modelRotationX={activeCarData?.specs?.rotation?.x || 0} 
+                                            offsetY={activeCarData?.specs?.offset?.y || 0} 
+                                            offsetZ={activeCarData?.specs?.offset?.z || 0} 
+                                            offsetX={activeCarData?.specs?.offset?.x || 0} 
+                                            gripBoost={vsAiMode ? 1.4 : 1.0} 
+                                        />
                                         {/* COCHE RIVAL (IA) - Solo si vsAiMode es true */}
                                         {vsAiMode && (
                                             <AnimatedCar 
@@ -1615,20 +1701,10 @@
                                                 totalLaps={targetLaps} 
                                                 systemId={currentSystem} 
                                                 resetToken={resetToken} 
-                                                carModelId={SERVER_CARS[0].id} 
-                                                carType="CUSTOM_OBJ" 
-                                                customData={{
-                                                    obj: SERVER_CARS[0].files.obj,
-                                                    mtl: SERVER_CARS[0].files.mtl,
-                                                    tex: SERVER_CARS[0].files.tex
-                                                }}
-                                                color={SERVER_CARS[0].color}
-                                                modelRotation={SERVER_CARS[0].specs.rotation.y} 
-                                                modelRotationZ={SERVER_CARS[0].specs.rotation.z} 
-                                                modelRotationX={SERVER_CARS[0].specs.rotation.x} 
-                                                offsetY={SERVER_CARS[0].specs.offset.y} 
-                                                offsetZ={SERVER_CARS[0].specs.offset.z} 
-                                                offsetX={SERVER_CARS[0].specs.offset.x}
+                                                carModelId="gt3_blue" 
+                                                carType="STD" 
+                                                color="#2563eb"
+                                                modelRotation={0} modelRotationZ={0} modelRotationX={0} offsetY={0} offsetZ={0} offsetX={0}
                                                 isRival={true}
                                                 difficultyLevel={aiDifficulty} 
                                             />
