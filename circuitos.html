@@ -151,7 +151,7 @@
             Bot, User, Activity, StopCircle, RefreshCw, Clock, Save, FolderOpen,
             Move3d, MousePointer2, PlayCircle, StopCircle as StopIcon, Truck, History, Upload, FileBox,
             Database, TreePine, Trees, BoxSelect, Eye, Image as ImageIcon,
-            Layers, Edit, Maximize, KeyRound
+            Layers, Edit, Maximize, KeyRound, Swords
         } from 'lucide-react';
 
         // --- GLOBAL VOICE FUNCTION ---
@@ -426,7 +426,84 @@
         const DraggableDecoration = ({ data, modelInfo, isSelected, isDecoMode, onUpdate, onSelect }) => { const { camera, raycaster, gl } = useThree(); const [isDragging, setIsDragging] = useState(false); const dragPlane = useMemo(() => new THREE.Plane(new THREE.Vector3(0, 1, 0), 0), []); const intersectPoint = useMemo(() => new THREE.Vector3(), []); const handlePointerDown = (e) => { if (!isDecoMode) return; e.stopPropagation(); onSelect(data.instanceId); setIsDragging(true); gl.domElement.style.cursor = 'grabbing'; }; useEffect(() => { const handleMove = (e) => { if (!isDragging) return; const rect = gl.domElement.getBoundingClientRect(); const x = ((e.clientX - rect.left) / rect.width) * 2 - 1; const y = -((e.clientY - rect.top) / rect.height) * 2 + 1; raycaster.setFromCamera(new THREE.Vector2(x, y), camera); if (raycaster.ray.intersectPlane(dragPlane, intersectPoint)) { onUpdate(data.instanceId, 'position', [intersectPoint.x, 0, intersectPoint.z]); } }; const handleUp = () => { setIsDragging(false); gl.domElement.style.cursor = 'auto'; }; if (isDragging) { window.addEventListener('pointermove', handleMove); window.addEventListener('pointerup', handleUp); } return () => { window.removeEventListener('pointermove', handleMove); window.removeEventListener('pointerup', handleUp); }; }, [isDragging, camera, raycaster, gl, dragPlane, onUpdate, data.instanceId]); return ( <group position={data.position} rotation={new THREE.Euler(data.rotation[0], data.rotation[1], data.rotation[2])} scale={[data.scale, data.scale, data.scale]} onPointerDown={handlePointerDown} onPointerOver={(e) => { if(isDecoMode) { e.stopPropagation(); gl.domElement.style.cursor = 'move'; } }} onPointerOut={(e) => { if(isDecoMode) gl.domElement.style.cursor = 'auto'; }} > <DecorationObject data={modelInfo} /> {isSelected && isDecoMode && ( <mesh position={[0, 6, 0]}> <boxGeometry args={[1, 14, 1]} /> <meshBasicMaterial color="yellow" wireframe /> </mesh> )} {isSelected && isDecoMode && ( <mesh position={[0, 0.1, 0]} rotation={[-Math.PI/2, 0, 0]}> <ringGeometry args={[5, 6, 32]} /> <meshBasicMaterial color="yellow" opacity={0.6} transparent /> </mesh> )} </group> ); };
 
         const createTrackSpline = (chain, selectedLane, systemPieces, systemSpecs) => { const points = []; const segmentMap = []; const offset = systemSpecs.railOffset; let currentLaneOffset = selectedLane === 1 ? offset : -offset; const numCrosses = chain.filter(s => systemPieces[s.pId] && systemPieces[s.pId].isCross).length; const iterations = (numCrosses % 2 !== 0) ? 2 : 1; const SUBDIVISIONS_PER_UNIT = 2.0; const TRACK_H = 0.6; let isBroken = false; for (let loop = 0; loop < iterations; loop++) { if (isBroken) break; for (const seg of chain) { if (isBroken) break; const def = systemPieces[seg.pId]; if (!def) continue; let numSteps = 5; let segLength = 0; if (def.len) { numSteps = Math.max(10, Math.ceil(def.len * SUBDIVISIONS_PER_UNIT)); segLength = def.len; } else if (def.ang) { const arcLen = (def.ang * Math.PI / 180) * def.r; numSteps = Math.max(10, Math.ceil(arcLen * SUBDIVISIONS_PER_UNIT)); segLength = arcLen; } const isCurve = def.type === 'CURVE'; const radius = isCurve ? def.r : Infinity; const label = def.label; const dir = seg.dir; const startOffset = currentLaneOffset; const endOffset = def.isCross ? -currentLaneOffset : currentLaneOffset; for (let i = 0; i <= numSteps; i++) { const t = i / numSteps; const localPos = new THREE.Vector3(); if (def.type === 'STRAIGHT') { if (def.isCross) { const blend = (1 - Math.cos(t * Math.PI)) * 0.5; const currentZ = startOffset + (endOffset - startOffset) * blend; localPos.set(t * def.len, TRACK_H, currentZ); } else { localPos.set(t * def.len, TRACK_H, currentLaneOffset); } } else { const isLeft = seg.dir === 1; const Reff = isLeft ? (def.r + currentLaneOffset) : (def.r - currentLaneOffset); const angleRad = t * (def.ang * Math.PI / 180); if (isLeft) { const theta = -Math.PI/2 + angleRad; localPos.set(Reff * Math.cos(theta), TRACK_H, -(Reff * Math.sin(theta) + def.r)); } else { const theta = Math.PI/2 - angleRad; localPos.set(Reff * Math.cos(theta), TRACK_H, -(Reff * Math.sin(theta) - def.r)); } } localPos.applyMatrix4(seg.mat); if (points.length > 0 && i === 0) { const lastP = points[points.length - 1]; if (localPos.distanceTo(lastP) > 5.0) { isBroken = true; break; } } if (points.length === 0 || points[points.length-1].distanceTo(localPos) > 0.001) { points.push(localPos); } } if (!isBroken) { segmentMap.push({ length: segLength, isCurve, radius, label, dir }); if (def.isCross) { currentLaneOffset = endOffset; } } } } if (points.length < 2) return null; const closed = points.length > 2 && points[0].distanceTo(points[points.length-1]) < 20; const curve = new THREE.CatmullRomCurve3(points, closed, 'centripetal', 0.1); const splineLength = curve.getLength(); let accumulated = 0; const normalizedMap = segmentMap.map(s => { const startT = accumulated / splineLength; accumulated += s.length; const endT = accumulated / splineLength; return { ...s, startT, endT }; }); return { curve, totalLength: splineLength, closed, points, map: normalizedMap }; };
-        const AnimatedCar = ({ tracks, throttle, isPlaying, isPaused, selectedLane = 1, onLap, motor, tires, voltage, weight, onDerail, driveMode, onTelemetry, totalLaps, systemId, resetToken, carModelId, carType, customData, modelRotation, modelRotationZ, modelRotationX, offsetY, offsetZ, offsetX }) => { 
+        
+        const TrackMesh = ({ def, isLeft, isSelected, onClick, systemSpecs, hasFence }) => {
+            const { width, railOffset, railGap, color } = systemSpecs;
+            const TRACK_H = 0.6;
+            const geom = useMemo(() => { if (!def) return null; if (def.type === 'STRAIGHT') { const g = new THREE.ExtrudeGeometry(createStraightShape(def.len, width), {depth: TRACK_H, bevelEnabled:false}); g.rotateX(-Math.PI/2); return g; } else { const g = new THREE.ExtrudeGeometry(createCurveShape(def.r, def.ang, isLeft, width), {depth: TRACK_H, bevelEnabled:false, curveSegments:64}); const yOff = isLeft ? def.r : -def.r; g.translate(0, yOff, 0); g.rotateX(-Math.PI/2); return g; } }, [def, isLeft, width]);
+            
+            // --- FENCE LOGIC UPDATED ---
+            const showTheFence = hasFence !== false;
+            const fenceGeom = useMemo(() => { 
+                if (!def || !showTheFence) return null; 
+                
+                const fenceHeight = 3.0; // Más alta
+                const fenceThickness = 0.6; // Más gruesa
+                const outerRadius = def.r + width/2 + 0.5; 
+                
+                if (def.type === 'STRAIGHT') {
+                    // Vallas para rectas
+                    const shape = new THREE.Shape();
+                    // Valla en lado trasero (visual)
+                    shape.moveTo(0, width/2 + 0.5);
+                    shape.lineTo(def.len, width/2 + 0.5);
+                    shape.lineTo(def.len, width/2 + 0.5 + fenceThickness);
+                    shape.lineTo(0, width/2 + 0.5 + fenceThickness);
+                    
+                    const g = new THREE.ExtrudeGeometry(shape, { depth: fenceHeight, bevelEnabled: false });
+                    g.rotateX(-Math.PI/2);
+                    return g;
+                } else {
+                    // Vallas para curvas
+                    const shape = new THREE.Shape();
+                    const start = isLeft ? -Math.PI/2 : Math.PI/2;
+                    const rad = (def.ang * Math.PI)/180;
+                    const end = isLeft ? start + rad : start - rad;
+                    
+                    shape.absarc(0, 0, outerRadius + fenceThickness, start, end, !isLeft);
+                    shape.absarc(0, 0, outerRadius, end, start, isLeft);
+                    
+                    const g = new THREE.ExtrudeGeometry(shape, { depth: fenceHeight, bevelEnabled: false, curveSegments: 32 });
+                    const yOff = isLeft ? def.r : -def.r;
+                    g.translate(0, yOff, 0);
+                    g.rotateX(-Math.PI/2);
+                    return g;
+                }
+            }, [def, isLeft, width, showTheFence]);
+
+            const trackMat = useMemo(() => new THREE.MeshStandardMaterial({ color: systemSpecs.color, roughness: 0.7, metalness: 0.1 }), [systemSpecs.color]);
+            const railMat = useMemo(() => new THREE.MeshStandardMaterial({ color: '#c0c0c0', metalness: 0.8, roughness: 0.3 }), []);
+            
+            // Material de Valla de Alta Visibilidad
+            const fenceMat = useMemo(() => { 
+                const canvas = document.createElement('canvas'); 
+                canvas.width = 64; 
+                canvas.height = 64; 
+                const ctx = canvas.getContext('2d'); 
+                // Fondo Blanco
+                ctx.fillStyle = '#ffffff'; 
+                ctx.fillRect(0,0,64,64); 
+                // Franja Roja Grande
+                ctx.fillStyle = '#ef4444'; 
+                ctx.fillRect(0, 0, 64, 32); 
+                // Borde inferior gris
+                ctx.fillStyle = '#333333';
+                ctx.fillRect(0, 60, 64, 4);
+
+                const tex = new THREE.CanvasTexture(canvas); 
+                tex.wrapS = THREE.RepeatWrapping;
+                tex.wrapT = THREE.RepeatWrapping;
+                // Repetir la textura para que se vean franjas
+                tex.repeat.set(def.type === 'STRAIGHT' ? def.len / 10 : (def.r * 0.1), 1);
+                
+                return new THREE.MeshStandardMaterial({ map: tex, roughness: 0.5, metalness: 0.0, side: THREE.DoubleSide }); 
+            }, [def, systemSpecs]);
+
+            const rails = useMemo(() => { if (!def) return null; if(def.type === 'STRAIGHT') { if (def.isCross) { const l_start = -railOffset; const l_end = railOffset; const H_RAIL = 0.05; const TANGENT_DIST = def.len * 0.35; const makeSCurve = (zStart, zEnd) => new THREE.CubicBezierCurve3(new THREE.Vector3(0, H_RAIL, zStart), new THREE.Vector3(TANGENT_DIST, H_RAIL, zStart), new THREE.Vector3(def.len - TANGENT_DIST, H_RAIL, zEnd), new THREE.Vector3(def.len, H_RAIL, zEnd)); const c1_L = makeSCurve(l_start - railGap, l_end - railGap); const c1_R = makeSCurve(l_start + railGap, l_end + railGap); const c2_L = makeSCurve(l_end - railGap, l_start - railGap); const c2_R = makeSCurve(l_end + railGap, l_start + railGap); return (<group position={[0, TRACK_H, 0]}><mesh geometry={new THREE.TubeGeometry(c1_L, 32, 0.08, 8, false)} material={railMat} /><mesh geometry={new THREE.TubeGeometry(c1_R, 32, 0.08, 8, false)} material={railMat} /><mesh geometry={new THREE.TubeGeometry(c2_L, 32, 0.08, 8, false)} material={railMat} /><mesh geometry={new THREE.TubeGeometry(c2_R, 32, 0.08, 8, false)} material={railMat} /></group>); } else { return (<group position={[0, TRACK_H+0.05, 0]}>{[-railOffset - railGap, -railOffset + railGap, railOffset - railGap, railOffset + railGap].map((off, i) => (<mesh key={i} position={[def.len/2, 0, off]} rotation={[-Math.PI/2,0,0]}><planeGeometry args={[def.len, 0.15]} /><primitive object={railMat} attach="material"/></mesh>))}</group>); } } else { const mkArc = (rOff) => { const s = new THREE.Shape(); const st = isLeft ? -Math.PI/2 : Math.PI/2; const rad = (def.ang * Math.PI)/180; const en = isLeft ? st + rad : st - rad; s.absarc(0,0, rOff + 0.075, st, en, !isLeft); s.absarc(0,0, rOff - 0.075, en, st, isLeft); const g = new THREE.ExtrudeGeometry(s, {depth:0.02, bevelEnabled:false, curveSegments:64}); g.translate(0, isLeft ? def.r : -def.r, 0); g.rotateX(-Math.PI/2); return g; }; return (<group position={[0, TRACK_H, 0]}>{ [def.r - railOffset - railGap, def.r - railOffset + railGap, def.r + railOffset - railGap, def.r + railOffset + railGap].map((off, i) => <mesh key={i} geometry={mkArc(off)} material={railMat} />)}</group>); } }, [def, isLeft, railMat, railOffset, railGap]);
+            return ( <group onClick={onClick}> <mesh geometry={geom} receiveShadow castShadow material={trackMat}> {isSelected && ( <lineSegments position={[0, 0.1, 0]}> <edgesGeometry args={[geom]} /> <lineBasicMaterial color="#ff9900" linewidth={5} transparent opacity={0.8} /> </lineSegments> )} {def.isPower && (<group position={[def.len/2, 0, 0]}><mesh position={[0, TRACK_H+0.5, -(width/2 + 2)]}><boxGeometry args={[10, 1, 4]} /><meshStandardMaterial color="#dc2626" /></mesh><mesh position={[0, TRACK_H+1.1, -(width/2 + 2)]} rotation={[-Math.PI/2,0,0]}><planeGeometry args={[8, 3]} /><meshBasicMaterial color="#ef4444" /></mesh></group>)} {def.isHalf && (<mesh position={[0, TRACK_H+0.01, 0]} rotation={[-Math.PI/2,0,0]}><ringGeometry args={[def.r-0.5, def.r+0.5, 32, 1, isLeft?-Math.PI/2:Math.PI/2, (def.ang*Math.PI)/180 * (isLeft?1:-1)]} /><meshBasicMaterial color={def.col} opacity={0.5} transparent /></mesh>)} </mesh> {rails} <mesh position={[0, TRACK_H/2, 0]}><boxGeometry args={[0.2, TRACK_H, width-0.5]} /><meshBasicMaterial color="#000" /></mesh> {fenceGeom && <mesh geometry={fenceGeom} material={fenceMat} position={[0, 0, 0]} castShadow receiveShadow />} </group> );
+        };
+
+        const AnimatedCar = ({ tracks, throttle, isPlaying, isPaused, selectedLane = 1, onLap, motor, tires, voltage, weight, onDerail, driveMode, onTelemetry, totalLaps, systemId, resetToken, carModelId, carType, customData, modelRotation, modelRotationZ, modelRotationX, offsetY, offsetZ, offsetX, isRival = false, difficultyLevel = 3 }) => { 
             const carRef = useRef(); 
             const [velocity, setVelocity] = useState(0); 
             const [progress, setProgress] = useState(0); 
@@ -476,11 +553,28 @@
                 const tireGrip = tires.grip; 
                 const magnetGrip = (MAGNET_FORCE / 25) * 0.6; 
                 const weightPenalty = (weight - 80) * 0.005; 
-                const totalGripFactor = (systemGrip + tireGrip * 0.5 + magnetGrip - weightPenalty); 
+                
+                // --- PHYSICS & AI DIFFICULTY LOGIC REBALANCED V4 ---
+                let effectiveGrip = systemGrip + tireGrip * 0.5 + magnetGrip - weightPenalty;
+                
+                if (isRival) {
+                    // Nivel 1: Grip 0.2x (Extremadamente lento, casi parado en curvas)
+                    // Nivel 2: Grip 0.4x (Principiante)
+                    // Nivel 3: Grip 0.7x (Amateur)
+                    // Nivel 4: Grip 1.0x (Normal)
+                    // Nivel 5: Grip 1.5x (Experto)
+                    const gripMultipliers = [0.2, 0.4, 0.7, 1.0, 1.5]; 
+                    const gripCheat = gripMultipliers[Math.max(0, Math.min(4, difficultyLevel - 1))];
+                    effectiveGrip *= gripCheat;
+                }
+
+                const totalGripFactor = effectiveGrip; 
                 const safeCornerSpeed = Math.sqrt(realRadius * 1500 * totalGripFactor); 
                 
                 let currentThrottle = throttle; 
-                if (driveMode === 'ai') { 
+                
+                // AI Logic (Both Player Autopilot and Rival)
+                if (driveMode === 'ai' || isRival) { 
                     const nextIdx = (actualIdx + 1) % trackSpline.map.length; 
                     const nextSeg = trackSpline.map[nextIdx]; 
                     let speedLimit = safeCornerSpeed; 
@@ -492,8 +586,22 @@
                             if (segmentProgress > 0.70) { speedLimit = nextCornerLimit * 0.95; } 
                         } 
                     } 
-                    if (velocity > speedLimit) currentThrottle = 0; 
-                    else currentThrottle = 0.9 + (motorFactor * 0.05); 
+                    
+                    if (velocity > speedLimit) {
+                        currentThrottle = 0; 
+                    } else {
+                        // AI Acceleration logic
+                        if (isRival) {
+                            // Dificultad Agresividad (Tope de acelerador)
+                            // Nivel 1: Máximo 25% de gas (Muy lento en rectas)
+                            // Nivel 5: 100% de gas
+                            const baseAggression = 0.25 + (difficultyLevel * 0.15); 
+                            currentThrottle = Math.min(1.0, baseAggression + (motorFactor * 0.05));
+                        } else {
+                            // Standard Autopilot (Player)
+                            currentThrottle = 0.9 + (motorFactor * 0.05); 
+                        }
+                    }
                 } 
                 
                 const targetSpeed = currentThrottle * carTopSpeed; 
@@ -512,11 +620,12 @@
                 telemetryTick.current += 1; 
                 if (onTelemetry && telemetryTick.current > 10) { 
                     telemetryTick.current = 0; 
-                    onTelemetry({ speed: realSpeedKmH, limit: limitRealSpeedKmH, section: currentSeg.label, throttle: currentThrottle, gForce: (newVelocity * newVelocity) / (realRadius * 980), gripLimit: (newVelocity / safeCornerSpeed) * 100 }); 
+                    onTelemetry({ speed: realSpeedKmH, limit: limitRealSpeedKmH, section: currentSeg.label, throttle: currentThrottle, gForce: (newVelocity * newVelocity) / (realRadius * 980), gripLimit: (newVelocity / safeCornerSpeed) * 100, progress: progress }); 
                 } 
                 
+                // --- DERAILMENT LOGIC ---
                 const DERAIL_THRESHOLD = safeCornerSpeed * 1.15; 
-                if (currentSeg.isCurve && newVelocity > DERAIL_THRESHOLD) { 
+                if (!isRival && currentSeg.isCurve && newVelocity > DERAIL_THRESHOLD) { 
                     setDerailed(true); 
                     const tangent = trackSpline.curve.getTangentAt(progress).normalize(); 
                     const up = new THREE.Vector3(0, 1, 0); 
@@ -577,7 +686,7 @@
                             </group> 
                         </group> 
                         {derailed && (<Text position={[0, 4, 0]} fontSize={2} color="yellow" rotation={[0, Math.PI/2, 0]}>!</Text>)} 
-                        {driveMode === 'ai' && (<Text position={[0, 5, 0]} fontSize={1.5} color="#3b82f6" rotation={[0, Math.PI/2, 0]}>AI</Text>)} 
+                        {driveMode === 'ai' && (<Text position={[0, 5, 0]} fontSize={1.5} color="#3b82f6" rotation={[0, Math.PI/2, 0]}>{isRival ? `RIVAL L${difficultyLevel}` : 'AI'}</Text>)} 
                     </group> 
                 </group> 
             ); 
@@ -585,18 +694,6 @@
         class ErrorBoundary extends React.Component { constructor(props) { super(props); this.state = { hasError: false }; } static getDerivedStateFromError(error) { return { hasError: true }; } componentDidCatch(error, errorInfo) { console.error("Error cargando modelo:", error); } render() { if (this.state.hasError) { return this.props.fallback; } return this.props.children; } }
         const DraggableBoard = React.forwardRef(({ width, length, enabled, onBoardClick, isPlacingTree, isDecoMode }, ref) => { const { camera, raycaster, gl } = useThree(); const [isDragging, setIsDragging] = useState(false); const dragPlane = useMemo(() => new THREE.Plane(new THREE.Vector3(0, 1, 0), 0), []); const intersectPoint = useMemo(() => new THREE.Vector3(), []); const offset = useRef(new THREE.Vector3()); const boardGeometry = useMemo(() => new THREE.BoxGeometry(width, length, 1.2), [width, length]); const handlePointerDown = (e) => { if (isDecoMode) return; if (!enabled || !ref.current || isPlacingTree) return; e.stopPropagation(); offset.current.subVectors(ref.current.position, e.point); setIsDragging(true); gl.domElement.style.cursor = 'grabbing'; }; const handleClick = (e) => { if ((isPlacingTree || isDecoMode) && onBoardClick) { e.stopPropagation(); onBoardClick(e.point); } }; useEffect(() => { const handleMove = (e) => { if (!isDragging || !ref.current) return; const rect = gl.domElement.getBoundingClientRect(); const x = ((e.clientX - rect.left) / rect.width) * 2 - 1; const y = -((e.clientY - rect.top) / rect.height) * 2 + 1; raycaster.setFromCamera(new THREE.Vector2(x, y), camera); if (raycaster.ray.intersectPlane(dragPlane, intersectPoint)) { ref.current.position.x = intersectPoint.x + offset.current.x; ref.current.position.z = intersectPoint.z + offset.current.z; } }; const handleUp = () => { setIsDragging(false); if (gl.domElement) gl.domElement.style.cursor = 'auto'; }; if (isDragging) { window.addEventListener('pointermove', handleMove); window.addEventListener('pointerup', handleUp); } return () => { window.removeEventListener('pointermove', handleMove); window.removeEventListener('pointerup', handleUp); }; }, [isDragging, camera, raycaster, gl, dragPlane]); if (!width || !length) return null; const cursorStyle = (isPlacingTree || isDecoMode) ? 'crosshair' : (enabled ? 'grab' : 'auto'); return ( <mesh ref={ref} rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.6, 0]} receiveShadow onPointerDown={handlePointerDown} onClick={handleClick} onPointerOver={() => { if(gl.domElement) gl.domElement.style.cursor = cursorStyle; }} onPointerOut={() => { if(gl.domElement) gl.domElement.style.cursor = 'auto'; }} geometry={boardGeometry} > <meshStandardMaterial color={enabled ? "#16a34a" : "#15803d"} roughness={1} /> <lineSegments position={[0,0,0.61]} rotation={[0,0,0]}> <edgesGeometry args={[boardGeometry]} /> <lineBasicMaterial color={enabled ? "#ffff00" : "#ffffff"} linewidth={2} opacity={0.3} transparent /> </lineSegments> <gridHelper args={[Math.max(width, length), Math.max(width, length)/10]} rotation={[Math.PI/2, 0, 0]} position={[0,0,0.61]} material-opacity={0.1} material-transparent /> </mesh> ); });
         const StartPieceHandler = ({ children, position, onPosChange, isSelected, enabled, dragEnabled, id }) => { const { camera, raycaster, gl } = useThree(); const [isDragging, setIsDragging] = useState(false); const plane = useMemo(() => new THREE.Plane(new THREE.Vector3(0, 1, 0), 0), []); const intersectPoint = useMemo(() => new THREE.Vector3(), []); const [hovered, setHovered] = useState(false); const handlePointerDown = (e) => { if (!dragEnabled) return; e.stopPropagation(); setIsDragging(true); if (gl.domElement) gl.domElement.style.cursor = 'grabbing'; }; useEffect(() => { const handleMove = (e) => { if (!isDragging || !dragEnabled) return; const rect = gl.domElement.getBoundingClientRect(); const x = ((e.clientX - rect.left) / rect.width) * 2 - 1; const y = -((e.clientY - rect.top) / rect.height) * 2 + 1; raycaster.setFromCamera(new THREE.Vector2(x, y), camera); if (raycaster.ray.intersectPlane(plane, intersectPoint)) { const snapX = Math.round(intersectPoint.x); const snapZ = Math.round(intersectPoint.z); onPosChange(id, new THREE.Vector3(snapX, 0, snapZ)); } }; const handleUp = () => { setIsDragging(false); if (gl.domElement) gl.domElement.style.cursor = 'auto'; }; if (isDragging) { window.addEventListener('pointermove', handleMove); window.addEventListener('pointerup', handleUp); } return () => { window.removeEventListener('pointermove', handleMove); window.removeEventListener('pointerup', handleUp); }; }, [isDragging, dragEnabled, camera, raycaster, gl, plane, onPosChange, id]); return ( <group position={position} > {children} {dragEnabled && ( <group position={[20, 15, 0]} onPointerDown={handlePointerDown} onPointerOver={() => { setHovered(true); gl.domElement.style.cursor = 'move'; }} onPointerOut={() => { setHovered(false); gl.domElement.style.cursor = 'auto'; }} > <mesh> <sphereGeometry args={[8, 32, 32]} /> <meshStandardMaterial color={hovered || isDragging ? "#facc15" : "#eab308"} transparent opacity={0.8} /> </mesh> <group scale={[2.5, 2.5, 2.5]} position={[0,0,0]}> <mesh position={[3, 0, 0]} rotation={[0, 0, -Math.PI/2]}> <coneGeometry args={[0.8, 2, 8]} /> <meshBasicMaterial color="white" /> </mesh> <mesh position={[-3, 0, 0]} rotation={[0, 0, Math.PI/2]}> <coneGeometry args={[0.8, 2, 8]} /> <meshBasicMaterial color="white" /> </mesh> <mesh position={[0, 0, 3]} rotation={[Math.PI/2, 0, 0]}> <coneGeometry args={[0.8, 2, 8]} /> <meshBasicMaterial color="white" /> </mesh> <mesh position={[0, 0, -3]} rotation={[-Math.PI/2, 0, 0]}> <coneGeometry args={[0.8, 2, 8]} /> <meshBasicMaterial color="white" /> </mesh> </group> <Text position={[0, 12, 0]} fontSize={6} color="yellow" anchorX="center" anchorY="middle" rotation={[-Math.PI/2, 0, 0]} fontWeight="bold" outlineWidth={0.2} outlineColor="black"> ARRASTRAR </Text> </group> )} {isSelected && enabled && !dragEnabled && ( <group position={[20, 5, 0]}> <Text fontSize={4} color="white" anchorX="center" anchorY="middle" rotation={[-Math.PI/2, 0, 0]}>SALIDA</Text> <mesh position={[0, -2, 0]} rotation={[-Math.PI/2, 0, 0]}><circleGeometry args={[8, 32]} /><meshBasicMaterial color="red" opacity={0.3} transparent /></mesh> </group> )} </group> ); };
-
-        const TrackMesh = ({ def, isLeft, isSelected, onClick, systemSpecs, hasFence }) => {
-            const { width, railOffset, railGap, color } = systemSpecs;
-            const TRACK_H = 0.6;
-            const geom = useMemo(() => { if (!def) return null; if (def.type === 'STRAIGHT') { const g = new THREE.ExtrudeGeometry(createStraightShape(def.len, width), {depth: TRACK_H, bevelEnabled:false}); g.rotateX(-Math.PI/2); return g; } else { const g = new THREE.ExtrudeGeometry(createCurveShape(def.r, def.ang, isLeft, width), {depth: TRACK_H, bevelEnabled:false, curveSegments:64}); const yOff = isLeft ? def.r : -def.r; g.translate(0, yOff, 0); g.rotateX(-Math.PI/2); return g; } }, [def, isLeft, width]);
-            const fenceGeom = useMemo(() => { if (!def || def.type !== 'CURVE' || hasFence === false) return null; const fenceHeight = 2.5; const fenceThickness = 0.3; const outerRadius = def.r + width/2 + 0.5; const shape = new THREE.Shape(); const start = isLeft ? -Math.PI/2 : Math.PI/2; const rad = (def.ang * Math.PI)/180; const end = isLeft ? start + rad : start - rad; shape.absarc(0, 0, outerRadius + fenceThickness, start, end, !isLeft); shape.absarc(0, 0, outerRadius, end, start, isLeft); const g = new THREE.ExtrudeGeometry(shape, { depth: fenceHeight, bevelEnabled: false, curveSegments: 32 }); const yOff = isLeft ? def.r : -def.r; g.translate(0, yOff, 0); g.rotateX(-Math.PI/2); return g; }, [def, isLeft, width, hasFence]);
-            const trackMat = useMemo(() => new THREE.MeshStandardMaterial({ color: systemSpecs.color, roughness: 0.7, metalness: 0.1 }), [systemSpecs.color]);
-            const railMat = useMemo(() => new THREE.MeshStandardMaterial({ color: '#c0c0c0', metalness: 0.8, roughness: 0.3 }), []);
-            const fenceMat = useMemo(() => { const canvas = document.createElement('canvas'); canvas.width = 128; canvas.height = 128; const ctx = canvas.getContext('2d'); ctx.fillStyle = '#64748b'; ctx.fillRect(0,0,128,128); ctx.fillStyle = '#94a3b8'; ctx.fillRect(0, 0, 128, 8); ctx.fillStyle = '#475569'; ctx.fillRect(0, 120, 128, 8); const tex = new THREE.CanvasTexture(canvas); return new THREE.MeshStandardMaterial({ map: tex, roughness: 0.6, metalness: 0.1 }); }, [def, systemSpecs]);
-            const rails = useMemo(() => { if (!def) return null; if(def.type === 'STRAIGHT') { if (def.isCross) { const l_start = -railOffset; const l_end = railOffset; const H_RAIL = 0.05; const TANGENT_DIST = def.len * 0.35; const makeSCurve = (zStart, zEnd) => new THREE.CubicBezierCurve3(new THREE.Vector3(0, H_RAIL, zStart), new THREE.Vector3(TANGENT_DIST, H_RAIL, zStart), new THREE.Vector3(def.len - TANGENT_DIST, H_RAIL, zEnd), new THREE.Vector3(def.len, H_RAIL, zEnd)); const c1_L = makeSCurve(l_start - railGap, l_end - railGap); const c1_R = makeSCurve(l_start + railGap, l_end + railGap); const c2_L = makeSCurve(l_end - railGap, l_start - railGap); const c2_R = makeSCurve(l_end + railGap, l_start + railGap); return (<group position={[0, TRACK_H, 0]}><mesh geometry={new THREE.TubeGeometry(c1_L, 32, 0.08, 8, false)} material={railMat} /><mesh geometry={new THREE.TubeGeometry(c1_R, 32, 0.08, 8, false)} material={railMat} /><mesh geometry={new THREE.TubeGeometry(c2_L, 32, 0.08, 8, false)} material={railMat} /><mesh geometry={new THREE.TubeGeometry(c2_R, 32, 0.08, 8, false)} material={railMat} /></group>); } else { return (<group position={[0, TRACK_H+0.05, 0]}>{[-railOffset - railGap, -railOffset + railGap, railOffset - railGap, railOffset + railGap].map((off, i) => (<mesh key={i} position={[def.len/2, 0, off]} rotation={[-Math.PI/2,0,0]}><planeGeometry args={[def.len, 0.15]} /><primitive object={railMat} attach="material"/></mesh>))}</group>); } } else { const mkArc = (rOff) => { const s = new THREE.Shape(); const st = isLeft ? -Math.PI/2 : Math.PI/2; const rad = (def.ang * Math.PI)/180; const en = isLeft ? st + rad : st - rad; s.absarc(0,0, rOff + 0.075, st, en, !isLeft); s.absarc(0,0, rOff - 0.075, en, st, isLeft); const g = new THREE.ExtrudeGeometry(s, {depth:0.02, bevelEnabled:false, curveSegments:64}); g.translate(0, isLeft ? def.r : -def.r, 0); g.rotateX(-Math.PI/2); return g; }; return (<group position={[0, TRACK_H, 0]}>{ [def.r - railOffset - railGap, def.r - railOffset + railGap, def.r + railOffset - railGap, def.r + railOffset + railGap].map((off, i) => <mesh key={i} geometry={mkArc(off)} material={railMat} />)}</group>); } }, [def, isLeft, railMat, railOffset, railGap]);
-            return ( <group onClick={onClick}> <mesh geometry={geom} receiveShadow castShadow material={trackMat}> {isSelected && ( <lineSegments position={[0, 0.1, 0]}> <edgesGeometry args={[geom]} /> <lineBasicMaterial color="#ff9900" linewidth={5} transparent opacity={0.8} /> </lineSegments> )} {def.isPower && (<group position={[def.len/2, 0, 0]}><mesh position={[0, TRACK_H+0.5, -(width/2 + 2)]}><boxGeometry args={[10, 1, 4]} /><meshStandardMaterial color="#dc2626" /></mesh><mesh position={[0, TRACK_H+1.1, -(width/2 + 2)]} rotation={[-Math.PI/2,0,0]}><planeGeometry args={[8, 3]} /><meshBasicMaterial color="#ef4444" /></mesh></group>)} {def.isHalf && (<mesh position={[0, TRACK_H+0.01, 0]} rotation={[-Math.PI/2,0,0]}><ringGeometry args={[def.r-0.5, def.r+0.5, 32, 1, isLeft?-Math.PI/2:Math.PI/2, (def.ang*Math.PI)/180 * (isLeft?1:-1)]} /><meshBasicMaterial color={def.col} opacity={0.5} transparent /></mesh>)} </mesh> {rails} <mesh position={[0, TRACK_H/2, 0]}><boxGeometry args={[0.2, TRACK_H, width-0.5]} /><meshBasicMaterial color="#000" /></mesh> {fenceGeom && <mesh geometry={fenceGeom} material={fenceMat} position={[0, 0, 0]} castShadow receiveShadow />} </group> );
-        };
 
         const SceneManager = ({ appMode, viewMode, onCaptureReady, boardRef, boardSize, setViewMode }) => { const { camera, controls, gl, scene } = useThree(); useEffect(() => { if (viewMode === 'editor') { if (appMode === 'builder') { camera.position.set(0, 500, 0); camera.lookAt(0,0,0); camera.rotation.z = -Math.PI / 2; if(controls) { controls.target.set(0,0,0); controls.update(); } } else if (appMode === 'racer') { camera.position.set(0, 200, 300); if(controls) { controls.target.set(0,0,0); controls.update(); } } } }, [appMode, viewMode, camera, controls]); useEffect(() => { if (viewMode === 'capturing') { const oldBg = scene.background; scene.background = new THREE.Color('#ffffff'); const padding = 1.1; let targetX = 0; let targetZ = 0; let dimX = 200; let dimZ = 200; if (boardRef && boardRef.current) { targetX = boardRef.current.position.x; targetZ = boardRef.current.position.z; dimX = boardSize.width; dimZ = boardSize.length; } const vFOV = THREE.MathUtils.degToRad(camera.fov); const aspect = gl.domElement.clientWidth / gl.domElement.clientHeight; const finalHeight = Math.max((dimZ / 2) / Math.tan(vFOV / 2), (dimX / 2) / (Math.tan(vFOV / 2) * aspect)) * padding; camera.position.set(targetX, finalHeight, targetZ); camera.lookAt(targetX, 0, targetZ); camera.rotation.set(-Math.PI/2, 0, 0); camera.updateProjectionMatrix(); if (controls) controls.enabled = false; setTimeout(() => { gl.render(scene, camera); const dataUrl = gl.domElement.toDataURL('image/jpeg', 1.0); onCaptureReady(dataUrl); scene.background = oldBg; if (controls) controls.enabled = true; }, 300); } else if (viewMode === 'reset_view') { camera.position.set(0, 400, 200); camera.lookAt(0,0,0); if (controls) { controls.target.set(0, 0, 0); controls.update(); } setViewMode('editor'); } }, [viewMode, camera, controls, gl, scene, onCaptureReady, boardRef, boardSize, setViewMode]); return null; };
         const CameraEventsListener = ({ enabled }) => { const { camera, controls } = useThree(); useEffect(() => { if (!enabled) return; const handleCmd = (e) => { if (!controls) return; const { type, val, x, y } = e.detail; if (type === 'zoom') { camera.position.y = Math.max(50, camera.position.y + val); } else if (type === 'rotate') { const currentAzimuth = controls.getAzimuthalAngle(); controls.setAzimuthalAngle(currentAzimuth + (Math.PI/2 * val)); } else if (type === 'pan') { const speed = 50; const vecRight = new THREE.Vector3(1, 0, 0).applyQuaternion(camera.quaternion).setY(0).normalize(); const vecUp = new THREE.Vector3(0, 1, 0).applyQuaternion(camera.quaternion).setY(0).normalize(); camera.position.addScaledVector(vecRight, x * speed).addScaledVector(vecUp, y * speed); controls.target.addScaledVector(vecRight, x * speed).addScaledVector(vecUp, y * speed); } controls.update(); }; window.addEventListener('ninco-cmd', handleCmd); return () => window.removeEventListener('ninco-cmd', handleCmd); }, [enabled, camera, controls]); return null; };
@@ -707,6 +804,13 @@
             const [nextDir, setNextDir] = useState(1);
             const [viewMode, setViewMode] = useState('editor'); 
             const [snapshotUrl, setSnapshotUrl] = useState(null);
+            
+            // --- ESTADOS NUEVOS PARA VS IA ---
+            const [vsAiMode, setVsAiMode] = useState(false);
+            const [aiDifficulty, setAiDifficulty] = useState(3); // NUEVO ESTADO PARA DIFICULTAD
+            const [aiRaceData, setAiRaceData] = useState({ currentLap: 0, lastLapTime: 0, bestLap: 0, totalTime: 0 });
+            const [playerProgress, setPlayerProgress] = useState(0);
+            const [aiProgress, setAiProgress] = useState(0);
 
             const [editablePresetCars, setEditablePresetCars] = useState(PRESET_CARS);
             const [isTuningLocked, setIsTuningLocked] = useState(true);
@@ -786,7 +890,7 @@
             const handleCaptureReady = (url) => { setSnapshotUrl(url); setViewMode('report'); };
             const downloadPDF = () => { const element = document.getElementById('printable-area'); if (!element) return; const container = document.createElement('div'); container.style.position = 'absolute'; container.style.top = '-9999px'; container.style.left = '0'; container.style.width = '1123px'; container.style.zIndex = '-1'; const clone = element.cloneNode(true); clone.style.width = '100%'; clone.style.height = 'auto'; clone.style.color = '#000'; clone.style.background = '#fff'; container.appendChild(clone); document.body.appendChild(container); const opt = { margin: 10, filename: `ninco-track-${Date.now()}.pdf`, image: { type: 'jpeg', quality: 0.98 }, html2canvas: { scale: 2, useCORS: true, scrollY: 0, windowWidth: 1200 }, jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' } }; if (window.html2pdf) { window.html2pdf().set(opt).from(clone).save().then(() => { document.body.removeChild(container); }).catch(err => { console.error("PDF Error", err); document.body.removeChild(container); }); } else { document.body.removeChild(container); setConfirmModal({ message: "Librería PDF no cargada.", onConfirm: () => { window.print(); setConfirmModal(null); }, isAlert: true }); } speak("Descargando PDF"); };
             const startBuilder = () => { setBoardSize({ width: parseFloat(inputSize.width), length: parseFloat(inputSize.length) }); setSegments([{ id: 1, pId: 'STD', dir: 1, type: 'START', pos: new THREE.Vector3(), rot: new THREE.Euler() }]); setSelId(1); setShowBoardConfig(false); if (window.Tone) { initAudio().catch(e => console.log("Audio init failed", e)); } };
-            const add = (pId) => { if(viewMode!=='editor') return; const newId = Date.now() + Math.random(); setSegments(prev => [...prev, { id: newId, pId, dir: nextDir, type: 'PIECE' }]); setSelId(newId); const def = piecesDef[pId]; };
+            const add = (pId) => { if(viewMode!=='editor') return; const newId = Date.now() + Math.random(); setSegments(prev => [...prev, { id: newId, pId, dir: nextDir, type: 'PIECE', showFence: true }]); setSelId(newId); const def = piecesDef[pId]; };
             const del = () => { if(viewMode!=='editor') return; const f = segments.filter(s => s.id !== selId); setSegments(f); if(f.length > 0) setSelId(f[f.length-1].id); };
             const undo = () => { if(viewMode!=='editor') return; if(segments.length > 1) { const newSegs = segments.slice(0, -1); setSegments(newSegs); setSelId(newSegs[newSegs.length-1].id); } };
             const flip = () => { if(viewMode!=='editor') return; const s = segments.find(x => x.id === selId); if(s && piecesDef[s.pId].type === 'CURVE') { setSegments(segments.map(x => x.id === selId ? {...x, dir: x.dir * -1} : x)); } };
@@ -955,10 +1059,27 @@
             const handleImportFile = (type, e) => { const file = e.target.files[0]; if (!file) return; const url = URL.createObjectURL(file); setImportState(prev => ({ ...prev, [type]: url, [`${type}Blob`]: file })); if (type === 'obj') setTempSpecs({ offset: {x:0, y:0, z:0}, rotation: {y:-90, z:0, x:0} }); };
             const saveImportedCar = () => { if (!importState.obj || !importState.name) { speak("Falta nombre o modelo"); return; } const newCar = { id: `custom-${Date.now()}`, name: importState.name, type: 'CUSTOM_OBJ', description: 'Personalizado', customData: { obj: importState.obj, mtl: importState.mtl, tex: importState.tex }, storage: { objBlob: importState.objBlob, mtlBlob: importState.mtlBlob, texBlob: importState.texBlob }, specs: JSON.parse(JSON.stringify(tempSpecs)) }; setCustomCars(prev => { const updated = [...prev, newCar]; set('ninco-custom-cars', updated); return updated; }); setImportState({ name: '', obj: null, mtl: null, tex: null, objBlob: null, mtlBlob: null, texBlob: null }); setSelectedCarModelId(newCar.id); };
             const renameCar = (id, newName) => { setCustomCars(prev => { const updated = prev.map(c => c.id === id ? { ...c, name: newName } : c); set('ninco-custom-cars', updated); return updated; }); };
-            const startRaceSequence = () => { initAudio(); setRaceState('countdown'); setLightStep(0); setRaceData({ currentLap: 0, lastLapTime: 0, bestLap: 0, totalTime: 0, avgLap: 0 }); speak("Semáforo en marcha"); };
+            
+            // --- NUEVA LÓGICA DE CARRERA CON IA ---
+            const startRaceSequence = () => { 
+                initAudio(); 
+                setRaceState('countdown'); 
+                setLightStep(0); 
+                setRaceData({ currentLap: 0, lastLapTime: 0, bestLap: 0, totalTime: 0, avgLap: 0 }); 
+                setAiRaceData({ currentLap: 0, lastLapTime: 0, bestLap: 0, totalTime: 0 }); 
+                speak("Semáforo en marcha"); 
+            };
             const pauseRace = () => { setRaceState('paused'); speak("Pausa"); };
             const resumeRace = () => { setRaceState('racing'); speak("Continuamos"); };
-            const restartRace = () => { setRaceState('idle'); setCarThrottle(0); setResetToken(prev => prev + 1); setRaceData({ currentLap: 0, lastLapTime: 0, bestLap: 0, totalTime: 0, avgLap: 0 }); speak("Vuelta a Inicio"); };
+            const restartRace = () => { 
+                setRaceState('idle'); 
+                setCarThrottle(0); 
+                setResetToken(prev => prev + 1); 
+                setRaceData({ currentLap: 0, lastLapTime: 0, bestLap: 0, totalTime: 0, avgLap: 0 }); 
+                setAiRaceData({ currentLap: 0, lastLapTime: 0, bestLap: 0, totalTime: 0 }); 
+                speak("Vuelta a Inicio"); 
+            };
+            
             const handleDerail = () => { if (driveMode === 'ai') return; setIsCrashed(true); playCrashSound(); speak("Salida de pista", true); setCarThrottle(0); setTimeout(() => setIsCrashed(false), 2000); };
             const toggleDriveMode = () => { const newMode = driveMode === 'manual' ? 'ai' : 'manual'; setDriveMode(newMode); speak(newMode === 'ai' ? "Modo IA activado" : "Control Manual", true); setCarThrottle(0); };
             const cycleLaps = () => { const idx = LAP_OPTIONS.indexOf(targetLaps); setTargetLaps(LAP_OPTIONS[(idx + 1) % LAP_OPTIONS.length]); speak(`Carrera a ${LAP_OPTIONS[(idx + 1) % LAP_OPTIONS.length]} vueltas`); };
@@ -973,11 +1094,28 @@
             useEffect(() => { let interval; if (raceState === 'countdown') { interval = setInterval(() => { setLightStep(prev => { if (prev >= 5) { setRaceState('racing'); clearInterval(interval); return 6; } return prev + 1; }); }, 1000); } return () => clearInterval(interval); }, [raceState]);
             useEffect(() => { let int; if(raceState === 'racing') { int = setInterval(() => { setRaceData(prev => ({...prev, totalTime: (Date.now() - raceStartTime.current)/1000})); }, 100); } return () => clearInterval(int); }, [raceState]);
             const handleLap = (lapTime) => { if (raceState === 'finished') return; setRaceData(prev => { const newLap = prev.currentLap + 1; const isBestLap = (prev.bestLap === 0 || lapTime < prev.bestLap); const totalRecordedTime = (prev.avgLap * prev.currentLap) + lapTime; const newAvg = totalRecordedTime / newLap; if (raceState === 'racing' && newLap >= targetLaps && targetLaps !== Infinity) { setRaceState('finished'); speak("Carrera finalizada", true); setCarThrottle(0); } else if (isBestLap && lapTime > 0) { speak(`Rápida, ${lapTime.toFixed(2)}`); } return { ...prev, currentLap: newLap, lastLapTime: lapTime, bestLap: isBestLap ? lapTime : prev.bestLap, avgLap: newAvg }; }); };
-            const handleTelemetry = (data) => { setTelemetry(data); };
+            
+            // --- NUEVOS HANDLERS IA ---
+            const handleAiLap = (lapTime) => { 
+                if(raceState === 'finished') return; 
+                setAiRaceData(prev => { 
+                    const newLap = prev.currentLap + 1; 
+                    const isBestLap = (prev.bestLap === 0 || lapTime < prev.bestLap); 
+                    return { ...prev, currentLap: newLap, lastLapTime: lapTime, bestLap: isBestLap ? lapTime : prev.bestLap }; 
+                }); 
+            };
+            const handleTelemetry = (data) => { setTelemetry(data); setPlayerProgress(data.progress || 0); };
+            const handleAiTelemetry = (data) => { setAiProgress(data.progress || 0); };
+
             const formatTime = (t) => { const m = Math.floor(t / 60); const s = Math.floor(t % 60); const ms = Math.floor((t * 10) % 10); return `${m}:${s.toString().padStart(2, '0')}.${ms}`; };
             const isSelectionStart = useMemo(() => { const s = segments.find(seg => seg.id === selId); return s && s.type === 'START'; }, [selId, segments]);
             const activeDecoData = useMemo(() => customDecos.find(d => d.id === activeDecoId) || BASE_DECOS[0], [customDecos, activeDecoId]);
             const selectedDecoObject = useMemo(() => placedDecos.find(d => d.instanceId === selectedDecoInstance), [placedDecos, selectedDecoInstance]);
+
+            // CÁLCULO DE POSICIÓN
+            const playerPosScore = raceData.currentLap + playerProgress;
+            const aiPosScore = aiRaceData.currentLap + aiProgress;
+            const playerRank = playerPosScore >= aiPosScore ? 1 : 2;
 
             return (
                 <div className="app-container">
@@ -999,7 +1137,6 @@
                             {/* BUILDER MODE TOOLS */}
                             {appMode === 'builder' && viewMode === 'editor' && !decoMode && (
                                 <>
-                                    {/* ... existing sidebar sections ... */}
                                     <div className="sidebar-section">
                                         <div className="flex justify-between items-center mb-1">
                                             <div className="sidebar-section-title mb-0">Espacio de Trabajo</div>
@@ -1188,7 +1325,6 @@
                             {/* RACER MODE TOOLS */}
                             {appMode === 'racer' && (
                                 <>
-                                    {/* ... existing racer controls ... */}
                                     <div className="sidebar-section">
                                         <div className="sidebar-section-title">Dirección de Carrera</div>
                                         {raceState === 'countdown' ? (
@@ -1209,6 +1345,42 @@
                                                 )}
                                             </div>
                                         )}
+                                        {/* BOTÓN VS IA Y SELECTOR DE DIFICULTAD */}
+                                        <div className="mt-2 bg-slate-900/30 p-1.5 rounded border border-slate-800">
+                                            <button 
+                                                onClick={() => { setVsAiMode(!vsAiMode); speak(vsAiMode ? "Modo Solitario" : `Rival activado nivel ${aiDifficulty}`); }} 
+                                                className={`btn-tile w-full flex-row gap-2 h-10 ${vsAiMode ? 'border-cyan-500 text-cyan-400 bg-cyan-950/30' : 'border-slate-700 text-slate-500'}`}
+                                            >
+                                                <Swords size={18} />
+                                                <span className="btn-label mt-0">{vsAiMode ? "CARRERA VS IA ACTIVA" : "ACTIVAR RIVAL (IA)"}</span>
+                                            </button>
+                                            
+                                            {vsAiMode && (
+                                                <div className="flex flex-col mt-2 animate-fade-in">
+                                                    <span className="text-[8px] font-bold text-slate-500 uppercase mb-1 flex justify-between">
+                                                        <span>NIVEL DE DIFICULTAD</span>
+                                                        <span className={aiDifficulty >= 4 ? "text-red-400" : (aiDifficulty === 1 ? "text-green-400" : "text-yellow-400")}>
+                                                            {aiDifficulty === 1 ? "NOVATO" : (aiDifficulty === 5 ? "LEYENDA" : `NIVEL ${aiDifficulty}`)}
+                                                        </span>
+                                                    </span>
+                                                    <div className="flex gap-1">
+                                                        {[1, 2, 3, 4, 5].map(level => (
+                                                            <button 
+                                                                key={level}
+                                                                onClick={() => { setAiDifficulty(level); speak(`Nivel ${level}`); }}
+                                                                className={`flex-1 h-6 rounded text-[10px] font-black border transition-all ${
+                                                                    aiDifficulty === level 
+                                                                        ? (level >= 4 ? 'bg-red-600 border-red-400 text-white shadow-[0_0_10px_red]' : 'bg-cyan-600 border-cyan-400 text-white shadow-[0_0_10px_cyan]') 
+                                                                        : 'bg-slate-800 border-slate-700 text-slate-500 hover:bg-slate-700 hover:text-white'
+                                                                }`}
+                                                            >
+                                                                {level}
+                                                            </button>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
                                     </div>
 
                                     <div className="sidebar-section">
@@ -1422,7 +1594,35 @@
                                 {viewMode==='editor' && appMode === 'builder' && !decoMode && (<group position={new THREE.Vector3().setFromMatrixPosition(pointerMatrix)} quaternion={new THREE.Quaternion().setFromRotationMatrix(pointerMatrix)}><mesh position={[0,1,0]}><coneGeometry args={[1, 2, 8]} /><meshBasicMaterial color="#22c55e" /></mesh></group>)}
                                 {placedDecos.map(d => { let modelInfo = customDecos.find(c => c.id === d.modelId); if (!modelInfo) modelInfo = BASE_DECOS.find(b => b.id === d.modelId); return ( <DraggableDecoration key={d.instanceId} data={d} modelInfo={modelInfo} isSelected={selectedDecoInstance === d.instanceId} isDecoMode={decoMode} onUpdate={updateDecoInstance} onSelect={setSelectedDecoInstance} /> ); })}
                                 {carEnabled && chain.length > 0 && viewMode === 'editor' && (
-                                    <AnimatedCar tracks={tracks} throttle={carThrottle} isPlaying={raceState !== 'paused' && raceState !== 'countdown' && raceState !== 'finished'} isPaused={raceState === 'paused'} selectedLane={selectedLane} onLap={handleLap} motor={selectedMotor} tires={selectedTire} voltage={selectedVoltage} weight={bodyWeight + chassisWeight} onDerail={handleDerail} driveMode={driveMode} onTelemetry={handleTelemetry} totalLaps={targetLaps} systemId={currentSystem} resetToken={resetToken} carModelId={selectedCarModelId} carType={activeCarData.type} customData={activeCarData?.customData} modelRotation={activeCarData?.specs?.rotation?.y || 0} modelRotationZ={activeCarData?.specs?.rotation?.z || 0} modelRotationX={activeCarData?.specs?.rotation?.x || 0} offsetY={activeCarData?.specs?.offset?.y || 0} offsetZ={activeCarData?.specs?.offset?.z || 0} offsetX={activeCarData?.specs?.offset?.x || 0} />
+                                    <>
+                                        <AnimatedCar tracks={tracks} throttle={carThrottle} isPlaying={raceState !== 'paused' && raceState !== 'countdown' && raceState !== 'finished'} isPaused={raceState === 'paused'} selectedLane={selectedLane} onLap={handleLap} motor={selectedMotor} tires={selectedTire} voltage={selectedVoltage} weight={bodyWeight + chassisWeight} onDerail={handleDerail} driveMode={driveMode} onTelemetry={handleTelemetry} totalLaps={targetLaps} systemId={currentSystem} resetToken={resetToken} carModelId={selectedCarModelId} carType={activeCarData.type} customData={activeCarData?.customData} modelRotation={activeCarData?.specs?.rotation?.y || 0} modelRotationZ={activeCarData?.specs?.rotation?.z || 0} modelRotationX={activeCarData?.specs?.rotation?.x || 0} offsetY={activeCarData?.specs?.offset?.y || 0} offsetZ={activeCarData?.specs?.offset?.z || 0} offsetX={activeCarData?.specs?.offset?.x || 0} />
+                                        {/* COCHE RIVAL (IA) - Solo si vsAiMode es true */}
+                                        {vsAiMode && (
+                                            <AnimatedCar 
+                                                tracks={tracks} 
+                                                throttle={0} 
+                                                isPlaying={raceState !== 'paused' && raceState !== 'countdown' && raceState !== 'finished'} 
+                                                isPaused={raceState === 'paused'} 
+                                                selectedLane={2} 
+                                                onLap={handleAiLap} 
+                                                motor={INITIAL_MOTORS[2]} 
+                                                tires={INITIAL_TIRES[1]} 
+                                                voltage={selectedVoltage} 
+                                                weight={90} 
+                                                driveMode="ai" 
+                                                onTelemetry={handleAiTelemetry} 
+                                                totalLaps={targetLaps} 
+                                                systemId={currentSystem} 
+                                                resetToken={resetToken} 
+                                                carModelId="gt3_blue" 
+                                                carType="STD" 
+                                                color="#2563eb"
+                                                modelRotation={0} modelRotationZ={0} modelRotationX={0} offsetY={0} offsetZ={0} offsetX={0}
+                                                isRival={true}
+                                                difficultyLevel={aiDifficulty} // PASAMOS EL NIVEL
+                                            />
+                                        )}
+                                    </>
                                 )}
                             </group>
                         </Canvas>
@@ -1432,7 +1632,7 @@
                         {carEnabled && viewMode === 'editor' && appMode === 'racer' && (
                             <>
                                 <div className="absolute top-0 left-0 w-full flex flex-col z-40 p-4 items-center pointer-events-none">
-                                    <div className="flex justify-between items-stretch gap-0 neon-panel-full p-0 rounded-xl overflow-hidden w-full max-w-3xl shadow-2xl">
+                                    <div className="flex justify-between items-stretch gap-0 neon-panel-full p-0 rounded-xl overflow-hidden w-full max-w-3xl shadow-2xl relative">
                                         <div className="flex flex-col flex-1 min-w-[180px] p-3 bg-gradient-to-r from-slate-900/80 to-transparent justify-center">
                                             <div className="flex items-center gap-2 mb-2 border-b border-cyan-500/30 pb-1"><Activity size={14} className="text-cyan-400 animate-pulse"/><span className="text-[10px] font-black text-cyan-400 uppercase tracking-widest drop-shadow-[0_0_5px_cyan]">VELOCIDAD</span></div>
                                             <div className="relative w-full h-4 bg-slate-900 rounded border border-slate-700 mb-3 group"><div style={{width: `${Math.min(100, (telemetry.limit/25)*100)}%`}} className="absolute top-0 left-0 h-full bg-red-900/20 border-r border-red-500/50 transition-all duration-300"></div><div style={{width: `${Math.min(100, (telemetry.speed/25)*100)}%`}} className={`absolute top-0 left-0 h-full transition-all duration-75 shadow-[0_0_10px_cyan] ${telemetry.speed > telemetry.limit ? 'bg-red-500 shadow-[0_0_15px_red]' : 'bg-cyan-400'}`}></div><span className="absolute inset-0 flex items-center justify-center text-[10px] font-black text-white mix-blend-difference z-10 font-mono tracking-wider">{telemetry.speed.toFixed(1)} KM/H</span></div>
@@ -1462,6 +1662,41 @@
                                             <div className="flex flex-col gap-1.5 w-full"><div className="flex justify-between items-center bg-slate-800/30 px-2 py-1 rounded"><span className="text-[9px] font-bold text-slate-400">TOTAL</span><span className="font-mono font-bold text-white text-sm">{formatTime(raceData.totalTime)}</span></div><div className="flex justify-between items-center bg-slate-800/30 px-2 py-1 rounded"><span className="text-[9px] font-bold text-yellow-500">MEJOR</span><span className="font-mono font-bold text-yellow-400 text-sm">{raceData.bestLap > 0 ? raceData.bestLap.toFixed(3) : '--.---'}</span></div><div className="flex justify-between items-center bg-slate-800/30 px-2 py-1 rounded"><span className="text-[9px] font-bold text-slate-400">ÚLTIMA</span><span className="font-mono font-bold text-slate-300 text-sm">{raceData.lastLapTime > 0 ? raceData.lastLapTime.toFixed(3) : '--.---'}</span></div><div className="flex justify-between items-center bg-slate-800/30 px-2 py-1 rounded border-l-2 border-blue-500"><span className="text-[9px] font-bold text-blue-400">MEDIA</span><span className="font-mono font-bold text-blue-200 text-sm">{raceData.avgLap > 0 ? raceData.avgLap.toFixed(3) : '--.---'}</span></div></div>
                                         </div>
                                     </div>
+                                    
+                                    {/* PANEL IA - RIVAL */}
+                                    {vsAiMode && (
+                                        <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 flex flex-col gap-1 bg-blue-900/90 backdrop-blur-md px-4 py-3 rounded-xl border border-blue-500/50 shadow-2xl pointer-events-none min-w-[200px]">
+                                            <div className="flex items-center justify-between border-b border-blue-500/30 pb-2 mb-1">
+                                                <div className="flex items-center gap-2">
+                                                    <Bot size={18} className="text-blue-300" />
+                                                    <span className="text-[10px] font-black text-blue-300 uppercase tracking-widest">RIVAL IA</span>
+                                                </div>
+                                                <span className="text-sm font-black text-white bg-blue-600 px-2 rounded">P{playerRank === 1 ? '2' : '1'}</span>
+                                            </div>
+                                            <div className="flex justify-between items-center">
+                                                <span className="text-[9px] font-bold text-blue-400">VUELTAS</span>
+                                                <span className="text-xl font-black text-white italic">{aiRaceData.currentLap}</span>
+                                            </div>
+                                            <div className="flex justify-between items-center">
+                                                <span className="text-[9px] font-bold text-slate-400">ÚLTIMA</span>
+                                                <span className="text-xs font-mono font-bold text-slate-300">{aiRaceData.lastLapTime > 0 ? aiRaceData.lastLapTime.toFixed(2) : '--.--'}</span>
+                                            </div>
+                                            <div className="flex justify-between items-center">
+                                                <span className="text-[9px] font-bold text-yellow-500">MEJOR</span>
+                                                <span className="text-xs font-mono font-bold text-yellow-400">{aiRaceData.bestLap > 0 ? aiRaceData.bestLap.toFixed(2) : '--.--'}</span>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* PANEL JUGADOR - POSICIÓN */}
+                                    {vsAiMode && (
+                                        <div className="absolute bottom-24 right-4 z-50 pointer-events-none">
+                                            <div className="bg-black/60 backdrop-blur rounded-full px-4 py-2 border border-slate-700 flex items-center gap-3 shadow-lg">
+                                                <span className="text-[10px] font-bold text-slate-400 uppercase">POSICIÓN</span>
+                                                <span className={`text-3xl font-black italic ${playerRank === 1 ? 'text-green-400 drop-shadow-[0_0_10px_green]' : 'text-red-500'}`}>{playerRank}/2</span>
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
                                 <div className="pointer-events-auto bg-black/80 backdrop-blur border-t border-slate-700 p-2 pb-safe flex gap-3 items-center absolute bottom-0 left-0 w-full z-50">
                                     <div className="flex items-center gap-2 flex-1 h-20"> 
