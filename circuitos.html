@@ -427,82 +427,6 @@
 
         const createTrackSpline = (chain, selectedLane, systemPieces, systemSpecs) => { const points = []; const segmentMap = []; const offset = systemSpecs.railOffset; let currentLaneOffset = selectedLane === 1 ? offset : -offset; const numCrosses = chain.filter(s => systemPieces[s.pId] && systemPieces[s.pId].isCross).length; const iterations = (numCrosses % 2 !== 0) ? 2 : 1; const SUBDIVISIONS_PER_UNIT = 2.0; const TRACK_H = 0.6; let isBroken = false; for (let loop = 0; loop < iterations; loop++) { if (isBroken) break; for (const seg of chain) { if (isBroken) break; const def = systemPieces[seg.pId]; if (!def) continue; let numSteps = 5; let segLength = 0; if (def.len) { numSteps = Math.max(10, Math.ceil(def.len * SUBDIVISIONS_PER_UNIT)); segLength = def.len; } else if (def.ang) { const arcLen = (def.ang * Math.PI / 180) * def.r; numSteps = Math.max(10, Math.ceil(arcLen * SUBDIVISIONS_PER_UNIT)); segLength = arcLen; } const isCurve = def.type === 'CURVE'; const radius = isCurve ? def.r : Infinity; const label = def.label; const dir = seg.dir; const startOffset = currentLaneOffset; const endOffset = def.isCross ? -currentLaneOffset : currentLaneOffset; for (let i = 0; i <= numSteps; i++) { const t = i / numSteps; const localPos = new THREE.Vector3(); if (def.type === 'STRAIGHT') { if (def.isCross) { const blend = (1 - Math.cos(t * Math.PI)) * 0.5; const currentZ = startOffset + (endOffset - startOffset) * blend; localPos.set(t * def.len, TRACK_H, currentZ); } else { localPos.set(t * def.len, TRACK_H, currentLaneOffset); } } else { const isLeft = seg.dir === 1; const Reff = isLeft ? (def.r + currentLaneOffset) : (def.r - currentLaneOffset); const angleRad = t * (def.ang * Math.PI / 180); if (isLeft) { const theta = -Math.PI/2 + angleRad; localPos.set(Reff * Math.cos(theta), TRACK_H, -(Reff * Math.sin(theta) + def.r)); } else { const theta = Math.PI/2 - angleRad; localPos.set(Reff * Math.cos(theta), TRACK_H, -(Reff * Math.sin(theta) - def.r)); } } localPos.applyMatrix4(seg.mat); if (points.length > 0 && i === 0) { const lastP = points[points.length - 1]; if (localPos.distanceTo(lastP) > 5.0) { isBroken = true; break; } } if (points.length === 0 || points[points.length-1].distanceTo(localPos) > 0.001) { points.push(localPos); } } if (!isBroken) { segmentMap.push({ length: segLength, isCurve, radius, label, dir }); if (def.isCross) { currentLaneOffset = endOffset; } } } } if (points.length < 2) return null; const closed = points.length > 2 && points[0].distanceTo(points[points.length-1]) < 20; const curve = new THREE.CatmullRomCurve3(points, closed, 'centripetal', 0.1); const splineLength = curve.getLength(); let accumulated = 0; const normalizedMap = segmentMap.map(s => { const startT = accumulated / splineLength; accumulated += s.length; const endT = accumulated / splineLength; return { ...s, startT, endT }; }); return { curve, totalLength: splineLength, closed, points, map: normalizedMap }; };
         
-        const TrackMesh = ({ def, isLeft, isSelected, onClick, systemSpecs, hasFence }) => {
-            const { width, railOffset, railGap, color } = systemSpecs;
-            const TRACK_H = 0.6;
-            const geom = useMemo(() => { if (!def) return null; if (def.type === 'STRAIGHT') { const g = new THREE.ExtrudeGeometry(createStraightShape(def.len, width), {depth: TRACK_H, bevelEnabled:false}); g.rotateX(-Math.PI/2); return g; } else { const g = new THREE.ExtrudeGeometry(createCurveShape(def.r, def.ang, isLeft, width), {depth: TRACK_H, bevelEnabled:false, curveSegments:64}); const yOff = isLeft ? def.r : -def.r; g.translate(0, yOff, 0); g.rotateX(-Math.PI/2); return g; } }, [def, isLeft, width]);
-            
-            // --- FENCE LOGIC UPDATED ---
-            const showTheFence = hasFence !== false;
-            const fenceGeom = useMemo(() => { 
-                if (!def || !showTheFence) return null; 
-                
-                const fenceHeight = 3.0; // Más alta
-                const fenceThickness = 0.6; // Más gruesa
-                const outerRadius = def.r + width/2 + 0.5; 
-                
-                if (def.type === 'STRAIGHT') {
-                    // Vallas para rectas
-                    const shape = new THREE.Shape();
-                    // Valla en lado trasero (visual)
-                    shape.moveTo(0, width/2 + 0.5);
-                    shape.lineTo(def.len, width/2 + 0.5);
-                    shape.lineTo(def.len, width/2 + 0.5 + fenceThickness);
-                    shape.lineTo(0, width/2 + 0.5 + fenceThickness);
-                    
-                    const g = new THREE.ExtrudeGeometry(shape, { depth: fenceHeight, bevelEnabled: false });
-                    g.rotateX(-Math.PI/2);
-                    return g;
-                } else {
-                    // Vallas para curvas
-                    const shape = new THREE.Shape();
-                    const start = isLeft ? -Math.PI/2 : Math.PI/2;
-                    const rad = (def.ang * Math.PI)/180;
-                    const end = isLeft ? start + rad : start - rad;
-                    
-                    shape.absarc(0, 0, outerRadius + fenceThickness, start, end, !isLeft);
-                    shape.absarc(0, 0, outerRadius, end, start, isLeft);
-                    
-                    const g = new THREE.ExtrudeGeometry(shape, { depth: fenceHeight, bevelEnabled: false, curveSegments: 32 });
-                    const yOff = isLeft ? def.r : -def.r;
-                    g.translate(0, yOff, 0);
-                    g.rotateX(-Math.PI/2);
-                    return g;
-                }
-            }, [def, isLeft, width, showTheFence]);
-
-            const trackMat = useMemo(() => new THREE.MeshStandardMaterial({ color: systemSpecs.color, roughness: 0.7, metalness: 0.1 }), [systemSpecs.color]);
-            const railMat = useMemo(() => new THREE.MeshStandardMaterial({ color: '#c0c0c0', metalness: 0.8, roughness: 0.3 }), []);
-            
-            // Material de Valla de Alta Visibilidad
-            const fenceMat = useMemo(() => { 
-                const canvas = document.createElement('canvas'); 
-                canvas.width = 64; 
-                canvas.height = 64; 
-                const ctx = canvas.getContext('2d'); 
-                // Fondo Blanco
-                ctx.fillStyle = '#ffffff'; 
-                ctx.fillRect(0,0,64,64); 
-                // Franja Roja Grande
-                ctx.fillStyle = '#ef4444'; 
-                ctx.fillRect(0, 0, 64, 32); 
-                // Borde inferior gris
-                ctx.fillStyle = '#333333';
-                ctx.fillRect(0, 60, 64, 4);
-
-                const tex = new THREE.CanvasTexture(canvas); 
-                tex.wrapS = THREE.RepeatWrapping;
-                tex.wrapT = THREE.RepeatWrapping;
-                // Repetir la textura para que se vean franjas
-                tex.repeat.set(def.type === 'STRAIGHT' ? def.len / 10 : (def.r * 0.1), 1);
-                
-                return new THREE.MeshStandardMaterial({ map: tex, roughness: 0.5, metalness: 0.0, side: THREE.DoubleSide }); 
-            }, [def, systemSpecs]);
-
-            const rails = useMemo(() => { if (!def) return null; if(def.type === 'STRAIGHT') { if (def.isCross) { const l_start = -railOffset; const l_end = railOffset; const H_RAIL = 0.05; const TANGENT_DIST = def.len * 0.35; const makeSCurve = (zStart, zEnd) => new THREE.CubicBezierCurve3(new THREE.Vector3(0, H_RAIL, zStart), new THREE.Vector3(TANGENT_DIST, H_RAIL, zStart), new THREE.Vector3(def.len - TANGENT_DIST, H_RAIL, zEnd), new THREE.Vector3(def.len, H_RAIL, zEnd)); const c1_L = makeSCurve(l_start - railGap, l_end - railGap); const c1_R = makeSCurve(l_start + railGap, l_end + railGap); const c2_L = makeSCurve(l_end - railGap, l_start - railGap); const c2_R = makeSCurve(l_end + railGap, l_start + railGap); return (<group position={[0, TRACK_H, 0]}><mesh geometry={new THREE.TubeGeometry(c1_L, 32, 0.08, 8, false)} material={railMat} /><mesh geometry={new THREE.TubeGeometry(c1_R, 32, 0.08, 8, false)} material={railMat} /><mesh geometry={new THREE.TubeGeometry(c2_L, 32, 0.08, 8, false)} material={railMat} /><mesh geometry={new THREE.TubeGeometry(c2_R, 32, 0.08, 8, false)} material={railMat} /></group>); } else { return (<group position={[0, TRACK_H+0.05, 0]}>{[-railOffset - railGap, -railOffset + railGap, railOffset - railGap, railOffset + railGap].map((off, i) => (<mesh key={i} position={[def.len/2, 0, off]} rotation={[-Math.PI/2,0,0]}><planeGeometry args={[def.len, 0.15]} /><primitive object={railMat} attach="material"/></mesh>))}</group>); } } else { const mkArc = (rOff) => { const s = new THREE.Shape(); const st = isLeft ? -Math.PI/2 : Math.PI/2; const rad = (def.ang * Math.PI)/180; const en = isLeft ? st + rad : st - rad; s.absarc(0,0, rOff + 0.075, st, en, !isLeft); s.absarc(0,0, rOff - 0.075, en, st, isLeft); const g = new THREE.ExtrudeGeometry(s, {depth:0.02, bevelEnabled:false, curveSegments:64}); g.translate(0, isLeft ? def.r : -def.r, 0); g.rotateX(-Math.PI/2); return g; }; return (<group position={[0, TRACK_H, 0]}>{ [def.r - railOffset - railGap, def.r - railOffset + railGap, def.r + railOffset - railGap, def.r + railOffset + railGap].map((off, i) => <mesh key={i} geometry={mkArc(off)} material={railMat} />)}</group>); } }, [def, isLeft, railMat, railOffset, railGap]);
-            return ( <group onClick={onClick}> <mesh geometry={geom} receiveShadow castShadow material={trackMat}> {isSelected && ( <lineSegments position={[0, 0.1, 0]}> <edgesGeometry args={[geom]} /> <lineBasicMaterial color="#ff9900" linewidth={5} transparent opacity={0.8} /> </lineSegments> )} {def.isPower && (<group position={[def.len/2, 0, 0]}><mesh position={[0, TRACK_H+0.5, -(width/2 + 2)]}><boxGeometry args={[10, 1, 4]} /><meshStandardMaterial color="#dc2626" /></mesh><mesh position={[0, TRACK_H+1.1, -(width/2 + 2)]} rotation={[-Math.PI/2,0,0]}><planeGeometry args={[8, 3]} /><meshBasicMaterial color="#ef4444" /></mesh></group>)} {def.isHalf && (<mesh position={[0, TRACK_H+0.01, 0]} rotation={[-Math.PI/2,0,0]}><ringGeometry args={[def.r-0.5, def.r+0.5, 32, 1, isLeft?-Math.PI/2:Math.PI/2, (def.ang*Math.PI)/180 * (isLeft?1:-1)]} /><meshBasicMaterial color={def.col} opacity={0.5} transparent /></mesh>)} </mesh> {rails} <mesh position={[0, TRACK_H/2, 0]}><boxGeometry args={[0.2, TRACK_H, width-0.5]} /><meshBasicMaterial color="#000" /></mesh> {fenceGeom && <mesh geometry={fenceGeom} material={fenceMat} position={[0, 0, 0]} castShadow receiveShadow />} </group> );
-        };
-
         const AnimatedCar = ({ tracks, throttle, isPlaying, isPaused, selectedLane = 1, onLap, motor, tires, voltage, weight, onDerail, driveMode, onTelemetry, totalLaps, systemId, resetToken, carModelId, carType, customData, modelRotation, modelRotationZ, modelRotationX, offsetY, offsetZ, offsetX, isRival = false, difficultyLevel = 3 }) => { 
             const carRef = useRef(); 
             const [velocity, setVelocity] = useState(0); 
@@ -539,6 +463,7 @@
                 const actualIdx = currentSegIdx !== -1 ? currentSegIdx : 0; 
                 const currentSeg = trackSpline.map[actualIdx]; 
                 
+                // 1. Base Specs
                 const BASE_MAX_SPEED = 550; 
                 const ACCEL_FACTOR = 200; 
                 const BRAKE_FACTOR = 450; 
@@ -549,20 +474,17 @@
                 const brakeRate = motor.torque * BRAKE_FACTOR; 
                 
                 const realRadius = currentSeg.isCurve ? currentSeg.radius : 9999; 
+                
+                // 2. Grip Calculation
                 const systemGrip = systemSpecs.gripFactor; 
                 const tireGrip = tires.grip; 
                 const magnetGrip = (MAGNET_FORCE / 25) * 0.6; 
                 const weightPenalty = (weight - 80) * 0.005; 
                 
-                // --- PHYSICS & AI DIFFICULTY LOGIC REBALANCED V4 ---
                 let effectiveGrip = systemGrip + tireGrip * 0.5 + magnetGrip - weightPenalty;
                 
                 if (isRival) {
-                    // Nivel 1: Grip 0.2x (Extremadamente lento, casi parado en curvas)
-                    // Nivel 2: Grip 0.4x (Principiante)
-                    // Nivel 3: Grip 0.7x (Amateur)
-                    // Nivel 4: Grip 1.0x (Normal)
-                    // Nivel 5: Grip 1.5x (Experto)
+                    // Dificultad IA: Grip Scaler (Tortuga -> Experto)
                     const gripMultipliers = [0.2, 0.4, 0.7, 1.0, 1.5]; 
                     const gripCheat = gripMultipliers[Math.max(0, Math.min(4, difficultyLevel - 1))];
                     effectiveGrip *= gripCheat;
@@ -571,13 +493,24 @@
                 const totalGripFactor = effectiveGrip; 
                 const safeCornerSpeed = Math.sqrt(realRadius * 1500 * totalGripFactor); 
                 
+                // 3. Throttle Logic
                 let currentThrottle = throttle; 
                 
-                // AI Logic (Both Player Autopilot and Rival)
-                if (driveMode === 'ai' || isRival) { 
+                if (driveMode === 'ai' || isRival) {
+                    // Base Autopilot Throttle
+                    if (isRival) {
+                        // Dificultad IA: Acelerador Tope
+                        const baseAggression = 0.25 + (difficultyLevel * 0.15); 
+                        currentThrottle = Math.min(1.0, baseAggression + (motorFactor * 0.05));
+                    } else {
+                        currentThrottle = 0.9 + (motorFactor * 0.05); 
+                    }
+
+                    // Cornering Logic
                     const nextIdx = (actualIdx + 1) % trackSpline.map.length; 
                     const nextSeg = trackSpline.map[nextIdx]; 
                     let speedLimit = safeCornerSpeed; 
+                    
                     if (nextSeg.isCurve) { 
                         const nextRadius = nextSeg.radius; 
                         const nextCornerLimit = Math.sqrt(nextRadius * 1500 * totalGripFactor); 
@@ -587,23 +520,10 @@
                         } 
                     } 
                     
-                    if (velocity > speedLimit) {
-                        currentThrottle = 0; 
-                    } else {
-                        // AI Acceleration logic
-                        if (isRival) {
-                            // Dificultad Agresividad (Tope de acelerador)
-                            // Nivel 1: Máximo 25% de gas (Muy lento en rectas)
-                            // Nivel 5: 100% de gas
-                            const baseAggression = 0.25 + (difficultyLevel * 0.15); 
-                            currentThrottle = Math.min(1.0, baseAggression + (motorFactor * 0.05));
-                        } else {
-                            // Standard Autopilot (Player)
-                            currentThrottle = 0.9 + (motorFactor * 0.05); 
-                        }
-                    }
-                } 
+                    if (velocity > speedLimit) currentThrottle = 0; 
+                }
                 
+                // 4. Physics Integration
                 const targetSpeed = currentThrottle * carTopSpeed; 
                 let newVelocity = velocity; 
                 if (targetSpeed > velocity) { 
@@ -694,6 +614,87 @@
         class ErrorBoundary extends React.Component { constructor(props) { super(props); this.state = { hasError: false }; } static getDerivedStateFromError(error) { return { hasError: true }; } componentDidCatch(error, errorInfo) { console.error("Error cargando modelo:", error); } render() { if (this.state.hasError) { return this.props.fallback; } return this.props.children; } }
         const DraggableBoard = React.forwardRef(({ width, length, enabled, onBoardClick, isPlacingTree, isDecoMode }, ref) => { const { camera, raycaster, gl } = useThree(); const [isDragging, setIsDragging] = useState(false); const dragPlane = useMemo(() => new THREE.Plane(new THREE.Vector3(0, 1, 0), 0), []); const intersectPoint = useMemo(() => new THREE.Vector3(), []); const offset = useRef(new THREE.Vector3()); const boardGeometry = useMemo(() => new THREE.BoxGeometry(width, length, 1.2), [width, length]); const handlePointerDown = (e) => { if (isDecoMode) return; if (!enabled || !ref.current || isPlacingTree) return; e.stopPropagation(); offset.current.subVectors(ref.current.position, e.point); setIsDragging(true); gl.domElement.style.cursor = 'grabbing'; }; const handleClick = (e) => { if ((isPlacingTree || isDecoMode) && onBoardClick) { e.stopPropagation(); onBoardClick(e.point); } }; useEffect(() => { const handleMove = (e) => { if (!isDragging || !ref.current) return; const rect = gl.domElement.getBoundingClientRect(); const x = ((e.clientX - rect.left) / rect.width) * 2 - 1; const y = -((e.clientY - rect.top) / rect.height) * 2 + 1; raycaster.setFromCamera(new THREE.Vector2(x, y), camera); if (raycaster.ray.intersectPlane(dragPlane, intersectPoint)) { ref.current.position.x = intersectPoint.x + offset.current.x; ref.current.position.z = intersectPoint.z + offset.current.z; } }; const handleUp = () => { setIsDragging(false); if (gl.domElement) gl.domElement.style.cursor = 'auto'; }; if (isDragging) { window.addEventListener('pointermove', handleMove); window.addEventListener('pointerup', handleUp); } return () => { window.removeEventListener('pointermove', handleMove); window.removeEventListener('pointerup', handleUp); }; }, [isDragging, camera, raycaster, gl, dragPlane]); if (!width || !length) return null; const cursorStyle = (isPlacingTree || isDecoMode) ? 'crosshair' : (enabled ? 'grab' : 'auto'); return ( <mesh ref={ref} rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.6, 0]} receiveShadow onPointerDown={handlePointerDown} onClick={handleClick} onPointerOver={() => { if(gl.domElement) gl.domElement.style.cursor = cursorStyle; }} onPointerOut={() => { if(gl.domElement) gl.domElement.style.cursor = 'auto'; }} geometry={boardGeometry} > <meshStandardMaterial color={enabled ? "#16a34a" : "#15803d"} roughness={1} /> <lineSegments position={[0,0,0.61]} rotation={[0,0,0]}> <edgesGeometry args={[boardGeometry]} /> <lineBasicMaterial color={enabled ? "#ffff00" : "#ffffff"} linewidth={2} opacity={0.3} transparent /> </lineSegments> <gridHelper args={[Math.max(width, length), Math.max(width, length)/10]} rotation={[Math.PI/2, 0, 0]} position={[0,0,0.61]} material-opacity={0.1} material-transparent /> </mesh> ); });
         const StartPieceHandler = ({ children, position, onPosChange, isSelected, enabled, dragEnabled, id }) => { const { camera, raycaster, gl } = useThree(); const [isDragging, setIsDragging] = useState(false); const plane = useMemo(() => new THREE.Plane(new THREE.Vector3(0, 1, 0), 0), []); const intersectPoint = useMemo(() => new THREE.Vector3(), []); const [hovered, setHovered] = useState(false); const handlePointerDown = (e) => { if (!dragEnabled) return; e.stopPropagation(); setIsDragging(true); if (gl.domElement) gl.domElement.style.cursor = 'grabbing'; }; useEffect(() => { const handleMove = (e) => { if (!isDragging || !dragEnabled) return; const rect = gl.domElement.getBoundingClientRect(); const x = ((e.clientX - rect.left) / rect.width) * 2 - 1; const y = -((e.clientY - rect.top) / rect.height) * 2 + 1; raycaster.setFromCamera(new THREE.Vector2(x, y), camera); if (raycaster.ray.intersectPlane(plane, intersectPoint)) { const snapX = Math.round(intersectPoint.x); const snapZ = Math.round(intersectPoint.z); onPosChange(id, new THREE.Vector3(snapX, 0, snapZ)); } }; const handleUp = () => { setIsDragging(false); if (gl.domElement) gl.domElement.style.cursor = 'auto'; }; if (isDragging) { window.addEventListener('pointermove', handleMove); window.addEventListener('pointerup', handleUp); } return () => { window.removeEventListener('pointermove', handleMove); window.removeEventListener('pointerup', handleUp); }; }, [isDragging, dragEnabled, camera, raycaster, gl, plane, onPosChange, id]); return ( <group position={position} > {children} {dragEnabled && ( <group position={[20, 15, 0]} onPointerDown={handlePointerDown} onPointerOver={() => { setHovered(true); gl.domElement.style.cursor = 'move'; }} onPointerOut={() => { setHovered(false); gl.domElement.style.cursor = 'auto'; }} > <mesh> <sphereGeometry args={[8, 32, 32]} /> <meshStandardMaterial color={hovered || isDragging ? "#facc15" : "#eab308"} transparent opacity={0.8} /> </mesh> <group scale={[2.5, 2.5, 2.5]} position={[0,0,0]}> <mesh position={[3, 0, 0]} rotation={[0, 0, -Math.PI/2]}> <coneGeometry args={[0.8, 2, 8]} /> <meshBasicMaterial color="white" /> </mesh> <mesh position={[-3, 0, 0]} rotation={[0, 0, Math.PI/2]}> <coneGeometry args={[0.8, 2, 8]} /> <meshBasicMaterial color="white" /> </mesh> <mesh position={[0, 0, 3]} rotation={[Math.PI/2, 0, 0]}> <coneGeometry args={[0.8, 2, 8]} /> <meshBasicMaterial color="white" /> </mesh> <mesh position={[0, 0, -3]} rotation={[-Math.PI/2, 0, 0]}> <coneGeometry args={[0.8, 2, 8]} /> <meshBasicMaterial color="white" /> </mesh> </group> <Text position={[0, 12, 0]} fontSize={6} color="yellow" anchorX="center" anchorY="middle" rotation={[-Math.PI/2, 0, 0]} fontWeight="bold" outlineWidth={0.2} outlineColor="black"> ARRASTRAR </Text> </group> )} {isSelected && enabled && !dragEnabled && ( <group position={[20, 5, 0]}> <Text fontSize={4} color="white" anchorX="center" anchorY="middle" rotation={[-Math.PI/2, 0, 0]}>SALIDA</Text> <mesh position={[0, -2, 0]} rotation={[-Math.PI/2, 0, 0]}><circleGeometry args={[8, 32]} /><meshBasicMaterial color="red" opacity={0.3} transparent /></mesh> </group> )} </group> ); };
+
+        const TrackMesh = ({ def, isLeft, isSelected, onClick, systemSpecs, hasFence }) => {
+            const { width, railOffset, railGap, color } = systemSpecs;
+            const TRACK_H = 0.6;
+            const geom = useMemo(() => { if (!def) return null; if (def.type === 'STRAIGHT') { const g = new THREE.ExtrudeGeometry(createStraightShape(def.len, width), {depth: TRACK_H, bevelEnabled:false}); g.rotateX(-Math.PI/2); return g; } else { const g = new THREE.ExtrudeGeometry(createCurveShape(def.r, def.ang, isLeft, width), {depth: TRACK_H, bevelEnabled:false, curveSegments:64}); const yOff = isLeft ? def.r : -def.r; g.translate(0, yOff, 0); g.rotateX(-Math.PI/2); return g; } }, [def, isLeft, width]);
+            
+            // --- FENCE LOGIC UPDATED ---
+            const showTheFence = hasFence !== false;
+            const fenceGeom = useMemo(() => { 
+                if (!def || !showTheFence) return null; 
+                
+                const fenceHeight = 3.0; // Más alta
+                const fenceThickness = 0.6; // Más gruesa
+                const outerRadius = def.r + width/2 + 0.5; 
+                
+                if (def.type === 'STRAIGHT') {
+                    // Vallas para rectas
+                    const shape = new THREE.Shape();
+                    // Lado "arriba" (según 2D) o Izquierda/Derecha según dirección
+                    // Vamos a poner vallas a ambos lados en rectas por defecto si está activado, o solo en un lado?
+                    // Por simplicidad visual, pongamos vallas traseras (arriba en Y local antes de rotar)
+                    shape.moveTo(0, width/2 + 0.5);
+                    shape.lineTo(def.len, width/2 + 0.5);
+                    shape.lineTo(def.len, width/2 + 0.5 + fenceThickness);
+                    shape.lineTo(0, width/2 + 0.5 + fenceThickness);
+                    
+                    const g = new THREE.ExtrudeGeometry(shape, { depth: fenceHeight, bevelEnabled: false });
+                    g.rotateX(-Math.PI/2);
+                    
+                    // Añadir también el otro lado para simetría en rectas? 
+                    // De momento solo el lado "exterior" estándar
+                    return g;
+                } else {
+                    // Vallas para curvas
+                    const shape = new THREE.Shape();
+                    const start = isLeft ? -Math.PI/2 : Math.PI/2;
+                    const rad = (def.ang * Math.PI)/180;
+                    const end = isLeft ? start + rad : start - rad;
+                    
+                    shape.absarc(0, 0, outerRadius + fenceThickness, start, end, !isLeft);
+                    shape.absarc(0, 0, outerRadius, end, start, isLeft);
+                    
+                    const g = new THREE.ExtrudeGeometry(shape, { depth: fenceHeight, bevelEnabled: false, curveSegments: 32 });
+                    const yOff = isLeft ? def.r : -def.r;
+                    g.translate(0, yOff, 0);
+                    g.rotateX(-Math.PI/2);
+                    return g;
+                }
+            }, [def, isLeft, width, showTheFence]);
+
+            const trackMat = useMemo(() => new THREE.MeshStandardMaterial({ color: systemSpecs.color, roughness: 0.7, metalness: 0.1 }), [systemSpecs.color]);
+            const railMat = useMemo(() => new THREE.MeshStandardMaterial({ color: '#c0c0c0', metalness: 0.8, roughness: 0.3 }), []);
+            
+            // Material de Valla de Alta Visibilidad
+            const fenceMat = useMemo(() => { 
+                const canvas = document.createElement('canvas'); 
+                canvas.width = 64; 
+                canvas.height = 64; 
+                const ctx = canvas.getContext('2d'); 
+                // Fondo Blanco
+                ctx.fillStyle = '#ffffff'; 
+                ctx.fillRect(0,0,64,64); 
+                // Franja Roja Grande
+                ctx.fillStyle = '#ef4444'; 
+                ctx.fillRect(0, 0, 64, 32); 
+                // Borde inferior gris
+                ctx.fillStyle = '#333333';
+                ctx.fillRect(0, 60, 64, 4);
+
+                const tex = new THREE.CanvasTexture(canvas); 
+                tex.wrapS = THREE.RepeatWrapping;
+                tex.wrapT = THREE.RepeatWrapping;
+                // Repetir la textura para que se vean franjas
+                tex.repeat.set(def.type === 'STRAIGHT' ? def.len / 10 : (def.r * 0.1), 1);
+                
+                return new THREE.MeshStandardMaterial({ map: tex, roughness: 0.5, metalness: 0.0, side: THREE.DoubleSide }); 
+            }, [def, systemSpecs]);
+
+            const rails = useMemo(() => { if (!def) return null; if(def.type === 'STRAIGHT') { if (def.isCross) { const l_start = -railOffset; const l_end = railOffset; const H_RAIL = 0.05; const TANGENT_DIST = def.len * 0.35; const makeSCurve = (zStart, zEnd) => new THREE.CubicBezierCurve3(new THREE.Vector3(0, H_RAIL, zStart), new THREE.Vector3(TANGENT_DIST, H_RAIL, zStart), new THREE.Vector3(def.len - TANGENT_DIST, H_RAIL, zEnd), new THREE.Vector3(def.len, H_RAIL, zEnd)); const c1_L = makeSCurve(l_start - railGap, l_end - railGap); const c1_R = makeSCurve(l_start + railGap, l_end + railGap); const c2_L = makeSCurve(l_end - railGap, l_start - railGap); const c2_R = makeSCurve(l_end + railGap, l_start + railGap); return (<group position={[0, TRACK_H, 0]}><mesh geometry={new THREE.TubeGeometry(c1_L, 32, 0.08, 8, false)} material={railMat} /><mesh geometry={new THREE.TubeGeometry(c1_R, 32, 0.08, 8, false)} material={railMat} /><mesh geometry={new THREE.TubeGeometry(c2_L, 32, 0.08, 8, false)} material={railMat} /><mesh geometry={new THREE.TubeGeometry(c2_R, 32, 0.08, 8, false)} material={railMat} /></group>); } else { return (<group position={[0, TRACK_H+0.05, 0]}>{[-railOffset - railGap, -railOffset + railGap, railOffset - railGap, railOffset + railGap].map((off, i) => (<mesh key={i} position={[def.len/2, 0, off]} rotation={[-Math.PI/2,0,0]}><planeGeometry args={[def.len, 0.15]} /><primitive object={railMat} attach="material"/></mesh>))}</group>); } } else { const mkArc = (rOff) => { const s = new THREE.Shape(); const st = isLeft ? -Math.PI/2 : Math.PI/2; const rad = (def.ang * Math.PI)/180; const en = isLeft ? st + rad : st - rad; s.absarc(0,0, rOff + 0.075, st, en, !isLeft); s.absarc(0,0, rOff - 0.075, en, st, isLeft); const g = new THREE.ExtrudeGeometry(s, {depth:0.02, bevelEnabled:false, curveSegments:64}); g.translate(0, isLeft ? def.r : -def.r, 0); g.rotateX(-Math.PI/2); return g; }; return (<group position={[0, TRACK_H, 0]}>{ [def.r - railOffset - railGap, def.r - railOffset + railGap, def.r + railOffset - railGap, def.r + railOffset + railGap].map((off, i) => <mesh key={i} geometry={mkArc(off)} material={railMat} />)}</group>); } }, [def, isLeft, railMat, railOffset, railGap]);
+            return ( <group onClick={onClick}> <mesh geometry={geom} receiveShadow castShadow material={trackMat}> {isSelected && ( <lineSegments position={[0, 0.1, 0]}> <edgesGeometry args={[geom]} /> <lineBasicMaterial color="#ff9900" linewidth={5} transparent opacity={0.8} /> </lineSegments> )} {def.isPower && (<group position={[def.len/2, 0, 0]}><mesh position={[0, TRACK_H+0.5, -(width/2 + 2)]}><boxGeometry args={[10, 1, 4]} /><meshStandardMaterial color="#dc2626" /></mesh><mesh position={[0, TRACK_H+1.1, -(width/2 + 2)]} rotation={[-Math.PI/2,0,0]}><planeGeometry args={[8, 3]} /><meshBasicMaterial color="#ef4444" /></mesh></group>)} {def.isHalf && (<mesh position={[0, TRACK_H+0.01, 0]} rotation={[-Math.PI/2,0,0]}><ringGeometry args={[def.r-0.5, def.r+0.5, 32, 1, isLeft?-Math.PI/2:Math.PI/2, (def.ang*Math.PI)/180 * (isLeft?1:-1)]} /><meshBasicMaterial color={def.col} opacity={0.5} transparent /></mesh>)} </mesh> {rails} <mesh position={[0, TRACK_H/2, 0]}><boxGeometry args={[0.2, TRACK_H, width-0.5]} /><meshBasicMaterial color="#000" /></mesh> {fenceGeom && <mesh geometry={fenceGeom} material={fenceMat} position={[0, 0, 0]} castShadow receiveShadow />} </group> );
+        };
 
         const SceneManager = ({ appMode, viewMode, onCaptureReady, boardRef, boardSize, setViewMode }) => { const { camera, controls, gl, scene } = useThree(); useEffect(() => { if (viewMode === 'editor') { if (appMode === 'builder') { camera.position.set(0, 500, 0); camera.lookAt(0,0,0); camera.rotation.z = -Math.PI / 2; if(controls) { controls.target.set(0,0,0); controls.update(); } } else if (appMode === 'racer') { camera.position.set(0, 200, 300); if(controls) { controls.target.set(0,0,0); controls.update(); } } } }, [appMode, viewMode, camera, controls]); useEffect(() => { if (viewMode === 'capturing') { const oldBg = scene.background; scene.background = new THREE.Color('#ffffff'); const padding = 1.1; let targetX = 0; let targetZ = 0; let dimX = 200; let dimZ = 200; if (boardRef && boardRef.current) { targetX = boardRef.current.position.x; targetZ = boardRef.current.position.z; dimX = boardSize.width; dimZ = boardSize.length; } const vFOV = THREE.MathUtils.degToRad(camera.fov); const aspect = gl.domElement.clientWidth / gl.domElement.clientHeight; const finalHeight = Math.max((dimZ / 2) / Math.tan(vFOV / 2), (dimX / 2) / (Math.tan(vFOV / 2) * aspect)) * padding; camera.position.set(targetX, finalHeight, targetZ); camera.lookAt(targetX, 0, targetZ); camera.rotation.set(-Math.PI/2, 0, 0); camera.updateProjectionMatrix(); if (controls) controls.enabled = false; setTimeout(() => { gl.render(scene, camera); const dataUrl = gl.domElement.toDataURL('image/jpeg', 1.0); onCaptureReady(dataUrl); scene.background = oldBg; if (controls) controls.enabled = true; }, 300); } else if (viewMode === 'reset_view') { camera.position.set(0, 400, 200); camera.lookAt(0,0,0); if (controls) { controls.target.set(0, 0, 0); controls.update(); } setViewMode('editor'); } }, [viewMode, camera, controls, gl, scene, onCaptureReady, boardRef, boardSize, setViewMode]); return null; };
         const CameraEventsListener = ({ enabled }) => { const { camera, controls } = useThree(); useEffect(() => { if (!enabled) return; const handleCmd = (e) => { if (!controls) return; const { type, val, x, y } = e.detail; if (type === 'zoom') { camera.position.y = Math.max(50, camera.position.y + val); } else if (type === 'rotate') { const currentAzimuth = controls.getAzimuthalAngle(); controls.setAzimuthalAngle(currentAzimuth + (Math.PI/2 * val)); } else if (type === 'pan') { const speed = 50; const vecRight = new THREE.Vector3(1, 0, 0).applyQuaternion(camera.quaternion).setY(0).normalize(); const vecUp = new THREE.Vector3(0, 1, 0).applyQuaternion(camera.quaternion).setY(0).normalize(); camera.position.addScaledVector(vecRight, x * speed).addScaledVector(vecUp, y * speed); controls.target.addScaledVector(vecRight, x * speed).addScaledVector(vecUp, y * speed); } controls.update(); }; window.addEventListener('ninco-cmd', handleCmd); return () => window.removeEventListener('ninco-cmd', handleCmd); }, [enabled, camera, controls]); return null; };
@@ -1614,12 +1615,22 @@
                                                 totalLaps={targetLaps} 
                                                 systemId={currentSystem} 
                                                 resetToken={resetToken} 
-                                                carModelId="gt3_blue" 
-                                                carType="STD" 
-                                                color="#2563eb"
-                                                modelRotation={0} modelRotationZ={0} modelRotationX={0} offsetY={0} offsetZ={0} offsetX={0}
+                                                carModelId={SERVER_CARS[0].id} 
+                                                carType="CUSTOM_OBJ" 
+                                                customData={{
+                                                    obj: SERVER_CARS[0].files.obj,
+                                                    mtl: SERVER_CARS[0].files.mtl,
+                                                    tex: SERVER_CARS[0].files.tex
+                                                }}
+                                                color={SERVER_CARS[0].color}
+                                                modelRotation={SERVER_CARS[0].specs.rotation.y} 
+                                                modelRotationZ={SERVER_CARS[0].specs.rotation.z} 
+                                                modelRotationX={SERVER_CARS[0].specs.rotation.x} 
+                                                offsetY={SERVER_CARS[0].specs.offset.y} 
+                                                offsetZ={SERVER_CARS[0].specs.offset.z} 
+                                                offsetX={SERVER_CARS[0].specs.offset.x}
                                                 isRival={true}
-                                                difficultyLevel={aiDifficulty} // PASAMOS EL NIVEL
+                                                difficultyLevel={aiDifficulty} 
                                             />
                                         )}
                                     </>
